@@ -139,6 +139,7 @@ Alerts are sent to **separate** Telegram channels:
 - Historical snapshots stored daily in Apify Key-Value Store
 - Separate dedup stores per alert category prevent duplicate alerts across runs
 - LinkedIn scraper uses rotating User-Agents, exponential backoff, and consecutive block detection
+- Intern Telegram alerts compact multi-line whitespace before rendering, and include a dedicated posted-date line when source data provides one
 
 ## Input Configuration
 
@@ -165,6 +166,7 @@ Alerts are sent to **separate** Telegram channels:
 ## Known Issues & Solutions
 
 - **LinkedIn blocking**: LinkedIn aggressively rate-limits scraping. The scraper now uses rotating UAs, exponential backoff, and stops after 3 consecutive blocks to avoid IP bans.
+- **LinkedIn metadata leakage**: Public LinkedIn cards may mix status badges and relative timestamps into the location block. Keep location extraction sanitized before persistence so Telegram posts do not render large blank gaps.
 - **Cartivate/AutoLanka failures**: These sites may change URLs or go down. The scraper logs `ALL_URLS_FAILED` and continues gracefully.
 - **Dealer sites failing**: Many dealer websites are poorly maintained; the scraper tries multiple URL patterns per brand.
 - **ITPro returns non-intern IT jobs**: By design — all IT positions are included since the site is IT-focused. The scoring system ranks true intern roles higher.

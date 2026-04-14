@@ -44,6 +44,47 @@ function randomDelay(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function cleanInlineText(text) {
+    if (!text) return '';
+    return String(text).replace(/\s+/g, ' ').trim();
+}
+
+function cleanupLinkedInLocation(text) {
+    if (!text) return '';
+
+    const cleaned = cleanInlineText(text)
+        .replace(/\b(Actively Hiring|Be an early applicant|Reposted)\b/gi, '')
+        .replace(/\b\d+\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\s+ago\b/gi, '')
+        .replace(/\s+,/g, ',')
+        .replace(/,\s*$/, '')
+        .trim();
+
+    return cleaned || 'Sri Lanka';
+}
+
+function extractLocation(card) {
+    const exactLocation = cleanInlineText(
+        card.find('.job-search-card__location, .base-search-card__location').first().text(),
+    );
+    if (exactLocation) return cleanupLinkedInLocation(exactLocation);
+
+    const locationLike = card.find('[class*="location"], .base-search-card__metadata').first();
+    if (!locationLike.length) return 'Sri Lanka';
+
+    // Prefer only the node's direct text so nested status/date labels do not leak into location.
+    const directText = cleanInlineText(
+        locationLike
+            .clone()
+            .children()
+            .remove()
+            .end()
+            .text(),
+    );
+
+    if (directText) return cleanupLinkedInLocation(directText);
+    return cleanupLinkedInLocation(locationLike.text());
+}
+
 /**
  * Build a LinkedIn public job search URL.
  */
@@ -138,11 +179,11 @@ async function fetchWithRetry(url, { maxRetries = 2, headers = {} } = {}) {
 function parseJobCard($, el) {
     const card = $(el);
 
-    const title = card.find('.base-search-card__title, .job-search-card__title, h3, [class*="title"]').first().text().trim();
-    const company = card.find('.base-search-card__subtitle, .job-search-card__subtitle, h4, [class*="subtitle"], [class*="company"]').first().text().trim();
-    const location = card.find('.job-search-card__location, .base-search-card__metadata, [class*="location"]').first().text().trim();
+    const title = cleanInlineText(card.find('.base-search-card__title, .job-search-card__title, h3, [class*="title"]').first().text());
+    const company = cleanInlineText(card.find('.base-search-card__subtitle, .job-search-card__subtitle, h4, [class*="subtitle"], [class*="company"]').first().text());
+    const location = extractLocation(card);
     const link = card.find('a.base-card__full-link, a[class*="card__full-link"], a').first().attr('href') || '';
-    const dateText = card.find('time, .job-search-card__listdate, [class*="date"]').first().text().trim();
+    const dateText = cleanInlineText(card.find('time, .job-search-card__listdate, [class*="date"]').first().text());
     const dateAttr = card.find('time').attr('datetime') || '';
     const image = card.find('img').first().attr('data-delayed-url') || card.find('img').first().attr('src') || '';
 

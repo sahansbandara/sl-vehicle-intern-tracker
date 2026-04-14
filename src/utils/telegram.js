@@ -21,6 +21,37 @@ function formatKm(n) {
     return `${n.toLocaleString('en-US')} km`;
 }
 
+function compactText(text, fallback = '') {
+    if (text === null || text === undefined || text === '') return fallback;
+    const cleaned = String(text).replace(/\s+/g, ' ').trim();
+    return cleaned || fallback;
+}
+
+function compactLocationText(text, fallback = 'N/A') {
+    const cleaned = compactText(text, fallback)
+        .replace(/\b(Actively Hiring|Be an early applicant|Reposted)\b/gi, '')
+        .replace(/\b\d+\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\s+ago\b/gi, '')
+        .replace(/\s+,/g, ',')
+        .replace(/,\s*$/, '')
+        .trim();
+
+    return cleaned || fallback;
+}
+
+function formatPostedDate(value) {
+    const cleaned = compactText(value);
+    if (!cleaned) return null;
+
+    const parsed = new Date(cleaned);
+    if (Number.isNaN(parsed.getTime())) return cleaned;
+
+    return parsed.toLocaleDateString('en-LK', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+}
+
 /**
  * Build field-specific hashtag from a field name.
  */
@@ -115,19 +146,24 @@ export async function sendInternAlert(botToken, chatId, post) {
     const scoreBar = '█'.repeat(Math.round(post.relevance_score / 10)) + '░'.repeat(10 - Math.round(post.relevance_score / 10));
 
     const qualsList = post.qualifications && post.qualifications.length > 0
-        ? post.qualifications.slice(0, 8).join(', ')
+        ? post.qualifications.slice(0, 8).map(q => compactText(q)).filter(Boolean).join(', ')
         : 'Not specified';
 
     const lines = [
-        `💼 *${escapeMd(post.title)}*`,
+        `💼 *${escapeMd(compactText(post.title, 'Intern Opportunity'))}*`,
         ``,
-        `🏢 *Company:* ${escapeMd(post.company || 'Not specified')}`,
-        `💰 *Salary:* ${escapeMd(post.salary_range || 'Not mentioned')}`,
-        `⏱ *Duration:* ${escapeMd(post.duration || 'Not specified')}`,
-        `📍 *Location:* ${escapeMd(post.location || 'N/A')}`,
-        `🎯 *Field:* ${escapeMd(post.field || 'IT')}`,
+        `🏢 *Company:* ${escapeMd(compactText(post.company, 'Not specified'))}`,
+        `💰 *Salary:* ${escapeMd(compactText(post.salary_range, 'Not mentioned'))}`,
+        `⏱ *Duration:* ${escapeMd(compactText(post.duration, 'Not specified'))}`,
+        `📍 *Location:* ${escapeMd(compactLocationText(post.location, 'N/A'))}`,
+        `🎯 *Field:* ${escapeMd(compactText(post.field, 'IT'))}`,
         `📋 *Skills:* ${escapeMd(qualsList)}`,
     ];
+
+    const postedDate = formatPostedDate(post.posted_date);
+    if (postedDate) {
+        lines.push(`🕒 *Posted:* ${escapeMd(postedDate)}`);
+    }
 
     if (post.deadline) {
         const deadlineDate = new Date(post.deadline).toLocaleDateString('en-LK', {
@@ -141,10 +177,10 @@ export async function sendInternAlert(botToken, chatId, post) {
         `⭐ *Relevance Score:* ${escapeMd(String(post.relevance_score))}/100`,
         `\`${scoreBar}\``,
         ``,
-        `🌐 *Source:* ${escapeMd(post.source)}`,
+        `🌐 *Source:* ${escapeMd(compactText(post.source, 'unknown'))}`,
         `[View Posting](${post.url})`,
         ``,
-        `${escapeMd('#intern #IT ' + fieldToHashtag(post.field))}`,
+        `${escapeMd('#intern #IT ' + fieldToHashtag(compactText(post.field)))}`,
     );
 
     const text = lines.join('\n');
