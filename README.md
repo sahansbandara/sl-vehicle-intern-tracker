@@ -181,11 +181,14 @@ INTERN_MAX_PAGES_PER_SITE=5
 ### Step 3: Run
 
 ```bash
+# If you use zsh, paste only the command lines below or run:
+# setopt interactivecomments
+
 # With .env file
 npm run start:local
 
-# Or with Apify CLI (creates local storage)
-apify run
+# Or with local Crawlee storage
+npx crawlee run
 
 # Run only vehicles
 MODE=vehicles npm run start:local
@@ -464,7 +467,9 @@ sl-vehicle-intern-tracker/
 
 ```bash
 # Local
-apify run 2>&1 | tee run.log
+npm run start:local 2>&1 | tee run.log
+# or
+npx crawlee run 2>&1 | tee run.log
 
 # Apify Cloud
 # Go to Console → Runs → Click on run → "Log" tab

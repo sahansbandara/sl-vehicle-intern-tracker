@@ -1,5 +1,5 @@
 {
-  "title": "Sri Lanka Vehicle & IT Intern Tracker v3.0 Input",
+  "title": "Sri Lanka Vehicle & IT Intern Tracker v3.1 Input",
   "type": "object",
   "schemaVersion": 1,
   "properties": {
@@ -10,16 +10,22 @@
       "editor": "textfield",
       "isSecret": true
     },
-    "TELEGRAM_CHAT_ID": {
-      "title": "Telegram Chat ID",
+    "TELEGRAM_VEHICLE_CHAT_ID": {
+      "title": "Telegram Vehicle Channel ID",
       "type": "string",
-      "description": "Target channel/chat ID",
+      "description": "Channel ID for vehicle updates (market listings, dealers, news)",
+      "editor": "textfield"
+    },
+    "TELEGRAM_INTERN_CHAT_ID": {
+      "title": "Telegram Intern Channel ID",
+      "type": "string",
+      "description": "Channel ID for IT internship updates",
       "editor": "textfield"
     },
     "TELEGRAM_OPS_CHAT_ID": {
       "title": "Telegram Ops Alert Chat ID (optional)",
       "type": "string",
-      "description": "Separate channel for scraper health alerts. Falls back to main chat.",
+      "description": "Separate channel for scraper health alerts. Falls back to vehicle channel.",
       "editor": "textfield",
       "nullable": true
     },
@@ -31,11 +37,19 @@
       "enum": ["vehicles", "interns", "both"],
       "default": "both"
     },
+    "MIN_PRICE_LKR": {
+      "title": "Minimum Vehicle Price (LKR)",
+      "type": "integer",
+      "description": "Minimum price filter — only show vehicles ABOVE this price. Default 10M.",
+      "default": 10000000,
+      "minimum": 0,
+      "maximum": 500000000
+    },
     "MAX_PRICE_LKR": {
       "title": "Maximum Vehicle Price (LKR)",
       "type": "integer",
-      "description": "Budget cap for vehicle alerts",
-      "default": 30000000,
+      "description": "Upper price cap for vehicle alerts. Default 500M (effectively no cap).",
+      "default": 500000000,
       "minimum": 100000,
       "maximum": 500000000
     },
@@ -101,5 +115,5 @@
       "default": ["IT", "Software", "Web", "Mobile", "Developer", "Engineering", "Data", "AI", "Machine Learning", "DevOps", "Cloud", "QA", "Testing", "UI", "UX", "Database", "Networking", "Cybersecurity", "Security", "System Administration", "Computer Science", "Full Stack", "Frontend", "Backend"]
     }
   },
-  "required": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]
+  "required": ["TELEGRAM_BOT_TOKEN"]
 }

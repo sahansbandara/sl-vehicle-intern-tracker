@@ -17,12 +17,15 @@ import { persistDataset, persistHistoricalSnapshot, persistDealerDataset, persis
  * 1. Market sites (ikman, patpat, riyasewana, autodirect, cartivate, autolanka)
  * 2. Official dealer sites (MG, BYD, Toyota, Hyundai, Suzuki, Kia, Nissan, Tata, DIMO, United Motors, BAIC)
  * 3. News sites (VIASL, Motorguide, Newswire, Daily Mirror, Ada Derana, EconomyNext, AutoLanka)
+ *
+ * Filters vehicles by MIN_PRICE_LKR (default: 10M) — only shows vehicles OVER 10 million LKR.
  */
 export async function runVehicleTracker({
     botToken,
     chatId,
     opsChatId,
-    maxPriceLkr = 30_000_000,
+    minPriceLkr = 10_000_000,
+    maxPriceLkr = 500_000_000,
     maxPagesPerSite = 10,
     sitesEnabled = ['ikman', 'patpat'],
     dealerBrands = [],
@@ -32,6 +35,7 @@ export async function runVehicleTracker({
         marketSites: sitesEnabled,
         dealerBrands: dealerBrands.length > 0 ? dealerBrands : 'ALL',
         newsEnabled,
+        minPriceLkr,
         maxPriceLkr,
     });
 
@@ -109,10 +113,14 @@ export async function runVehicleTracker({
         const deduped = dedupeListings(allMarketListings);
         log.info(`After dedupe: ${deduped.length} unique market listings`);
 
-        const withinBudget = deduped.filter(l => l.price_lkr && l.price_lkr <= maxPriceLkr);
-        log.info(`Within budget (<= ${maxPriceLkr}): ${withinBudget.length} listings`);
+        // Filter: only vehicles with price >= minPriceLkr (over 10M)
+        const inRange = deduped.filter(l => {
+            if (!l.price_lkr) return false;
+            return l.price_lkr >= minPriceLkr && l.price_lkr <= maxPriceLkr;
+        });
+        log.info(`In price range (${minPriceLkr.toLocaleString()} - ${maxPriceLkr.toLocaleString()}): ${inRange.length} listings`);
 
-        const scored = scoreListings(withinBudget);
+        const scored = scoreListings(inRange);
         await persistDataset(scored);
         await persistHistoricalSnapshot(scored);
 
@@ -215,6 +223,9 @@ export async function runVehicleTracker({
         ``,
         `🏭 Official Dealers: ${dealerListings.length} models`,
         `📰 News Articles: ${newsArticles.length}`,
+        ``,
+        `💰 Price Range: ${minPriceLkr.toLocaleString()} - ${maxPriceLkr.toLocaleString()} LKR`,
+        `📢 Vehicle Channel: ${chatId}`,
         ``,
         `🔔 Alerts Sent:`,
         `  • Market: ${marketAlertsSent}`,

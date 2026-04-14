@@ -50,7 +50,7 @@ export async function sendDealAlert(botToken, chatId, listing) {
         ``,
         `[View Listing](${listing.url})`,
         ``,
-        `${escapeMd('#vehicle #under30M #' + (listing.source || 'market'))}`,
+        `${escapeMd('#vehicle #over10M #' + (listing.source || 'market'))}`,
     ];
 
     const text = lines.join('\n');
