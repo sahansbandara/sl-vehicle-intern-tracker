@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { log } from 'apify';
+import { parsePostedDate } from '../utils/normalize.js';
 
 /**
  * Scrape LinkedIn public job search for IT internships in Sri Lanka.
@@ -34,6 +35,15 @@ const USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0',
+];
+
+const IT_KEYWORDS = [
+    'IT', 'Software', 'Web', 'Mobile', 'Developer', 'Engineering', 'Data',
+    'AI', 'Machine Learning', 'DevOps', 'Cloud', 'QA', 'Testing', 'UI', 'UX',
+    'Database', 'Networking', 'Cybersecurity', 'Security', 'System Administration',
+    'Computer Science', 'Full Stack', 'Frontend', 'Backend', 'Python', 'Java',
+    'React', 'Node.js', 'AWS', 'Azure', 'Programmer', 'Analyst', 'Tech',
+    'Information Technology', 'ICT', 'Help Desk', 'Network', 'Infrastructure',
 ];
 
 function randomUA() {
@@ -83,6 +93,12 @@ function extractLocation(card) {
 
     if (directText) return cleanupLinkedInLocation(directText);
     return cleanupLinkedInLocation(locationLike.text());
+}
+
+function matchesITKeywords(text, extraKeywords = []) {
+    const lower = String(text || '').toLowerCase();
+    const allKeywords = [...IT_KEYWORDS, ...extraKeywords];
+    return allKeywords.some(keyword => lower.includes(String(keyword).toLowerCase()));
 }
 
 /**
@@ -215,7 +231,7 @@ function parseJobCard($, el) {
         salary_range: null,
         field,
         is_intern: /intern|trainee|apprentice|attachment|industrial training/i.test(title),
-        posted_date: dateAttr || dateText || null,
+        posted_date: parsePostedDate(dateAttr || dateText),
         deadline: null,
         qualifications: [],
         description: null,
@@ -285,6 +301,8 @@ export async function scrapeLinkedinJobs({ maxPages = 2, keywords = [] } = {}) {
             $(cardSelector).each((_, el) => {
                 const post = parseJobCard($, el);
                 if (!post) return;
+                if (!post.is_intern) return;
+                if (!matchesITKeywords(`${post.title} ${post.company}`, keywords)) return;
 
                 // Dedupe across queries
                 const dedupeKey = `${post.title}-${post.company}`.toLowerCase();

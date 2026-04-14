@@ -74,6 +74,7 @@ const NEWS_ENABLED = parseBoolean(input.NEWS_ENABLED) ?? parseBoolean(process.en
 
 // Intern tracker config
 const INTERN_MAX_PAGES_PER_SITE = parseInteger(input.INTERN_MAX_PAGES_PER_SITE) ?? parseInteger(process.env.INTERN_MAX_PAGES_PER_SITE) ?? 5;
+const INTERN_MAX_POST_AGE_DAYS = parseInteger(input.INTERN_MAX_POST_AGE_DAYS) ?? parseInteger(process.env.INTERN_MAX_POST_AGE_DAYS) ?? 14;
 const INTERN_SITES_ENABLED = parseStringArray(input.INTERN_SITES_ENABLED) ?? parseStringArray(process.env.INTERN_SITES_ENABLED) ?? DEFAULT_INTERN_SITES;
 const INTERN_KEYWORDS = parseStringArray(input.INTERN_KEYWORDS) ?? parseStringArray(process.env.INTERN_KEYWORDS) ?? DEFAULT_INTERN_KEYWORDS;
 const MODE = input.MODE ?? process.env.MODE ?? 'both';
@@ -136,6 +137,7 @@ if (mode === 'interns' || mode === 'both') {
                 chatId: internChatId,
                 opsChatId,
                 maxPagesPerSite: INTERN_MAX_PAGES_PER_SITE,
+                maxPostAgeDays: INTERN_MAX_POST_AGE_DAYS,
                 sitesEnabled: INTERN_SITES_ENABLED,
                 keywords: INTERN_KEYWORDS,
             });

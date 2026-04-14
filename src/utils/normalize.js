@@ -55,6 +55,10 @@ export function normalizeInternPost(raw) {
     const posted_date = parsePostedDate(raw.posted_raw);
     const deadline = parseDeadline(raw.deadline_raw);
     const salary_range = parseSalaryRange(raw.salary_raw);
+    const is_intern = typeof raw.is_intern === 'boolean'
+        ? raw.is_intern
+        : /\b(?:intern(?:ship)?|trainee|training|industrial\s*training|undergraduate|placement|apprentice|attachment)\b/i
+            .test(`${raw.title || ''} ${raw.raw_text || ''}`);
 
     return {
         id,
@@ -67,6 +71,7 @@ export function normalizeInternPost(raw) {
         qualifications: raw.qualifications || [],
         location: cleanLocation(raw.location),
         field: raw.field || 'IT General',
+        is_intern,
         posted_date,
         deadline,
         scraped_at: new Date().toISOString(),
@@ -196,17 +201,22 @@ export function parsePostedDate(raw) {
         const d = new Date(now); d.setDate(d.getDate() - 1); return d.toISOString();
     }
 
-    const rel = s.match(/(\d+)\s*(hour|day|week|month)s?\s*ago/);
+    const rel = s.match(/(\d+)\s*(minute|hour|day|week|month|year)s?\s*ago/);
     if (rel) {
         const n = parseInt(rel[1]);
         const unit = rel[2];
         const d = new Date(now);
+        if (unit === 'minute') d.setMinutes(d.getMinutes() - n);
         if (unit === 'hour') d.setHours(d.getHours() - n);
         if (unit === 'day') d.setDate(d.getDate() - n);
         if (unit === 'week') d.setDate(d.getDate() - n * 7);
         if (unit === 'month') d.setMonth(d.getMonth() - n);
+        if (unit === 'year') d.setFullYear(d.getFullYear() - n);
         return d.toISOString();
     }
+
+    const nativeParsed = new Date(raw);
+    if (!isNaN(nativeParsed.getTime())) return nativeParsed.toISOString();
 
     // "Apr 3" style
     const monMatch = raw.match(/([A-Z][a-z]{2})\s+(\d{1,2})/);

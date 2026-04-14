@@ -140,6 +140,7 @@ Alerts are sent to **separate** Telegram channels:
 - Separate dedup stores per alert category prevent duplicate alerts across runs
 - LinkedIn scraper uses rotating User-Agents, exponential backoff, and consecutive block detection
 - Intern Telegram alerts compact multi-line whitespace before rendering, and include a dedicated posted-date line when source data provides one
+- The intern pipeline is strict: only `is_intern === true` posts are eligible for the intern channel, and recent-age filtering happens after that gate
 
 ## Input Configuration
 
@@ -160,6 +161,7 @@ Alerts are sent to **separate** Telegram channels:
 - `DEALER_BRANDS` — Official dealer brands, empty = all 11 (default: `[]`)
 - `NEWS_ENABLED` — Enable vehicle news monitoring (default: `true`)
 - `INTERN_MAX_PAGES_PER_SITE` — Max pages per intern site (default: 5)
+- `INTERN_MAX_POST_AGE_DAYS` — Only keep internship posts newer than this many days (default: 14)
 - `INTERN_SITES_ENABLED` — Intern sites (default: `["topjobs", "xpress-jobs", "ikman-jobs", "itpro", "linkedin"]`)
 - `INTERN_KEYWORDS` — IT filter keywords (default: 30 keywords covering all IT subfields)
 
@@ -167,6 +169,7 @@ Alerts are sent to **separate** Telegram channels:
 
 - **LinkedIn blocking**: LinkedIn aggressively rate-limits scraping. The scraper now uses rotating UAs, exponential backoff, and stops after 3 consecutive blocks to avoid IP bans.
 - **LinkedIn metadata leakage**: Public LinkedIn cards may mix status badges and relative timestamps into the location block. Keep location extraction sanitized before persistence so Telegram posts do not render large blank gaps.
+- **Intern post freshness**: Internship alerts are intentionally strict. Keep only posts with a parseable `posted_date` inside the last 14 days by default; drop older or undated posts before scoring, persistence, and Telegram delivery.
 - **Cartivate/AutoLanka failures**: These sites may change URLs or go down. The scraper logs `ALL_URLS_FAILED` and continues gracefully.
 - **Dealer sites failing**: Many dealer websites are poorly maintained; the scraper tries multiple URL patterns per brand.
 - **ITPro returns non-intern IT jobs**: By design — all IT positions are included since the site is IT-focused. The scoring system ranks true intern roles higher.

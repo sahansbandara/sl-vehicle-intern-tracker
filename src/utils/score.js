@@ -45,6 +45,24 @@ export function scoreListings(listings) {
     });
 }
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+export function getInternPostAgeDays(postedDate, now = Date.now()) {
+    if (!postedDate) return null;
+
+    const postedTime = new Date(postedDate).getTime();
+    if (Number.isNaN(postedTime)) return null;
+
+    return Math.max(0, now - postedTime) / MS_PER_DAY;
+}
+
+export function filterRecentInternPosts(posts, { maxAgeDays = 14, now = Date.now() } = {}) {
+    return posts.filter(post => {
+        const ageDays = getInternPostAgeDays(post.posted_date, now);
+        return ageDays !== null && ageDays <= maxAgeDays;
+    });
+}
+
 /**
  * Calculate relevance_score for each intern post in [0, 100].
  *
@@ -116,9 +134,8 @@ export function scoreInternPosts(posts) {
         score += breakdown.location;
 
         // Recency bonus
-        if (post.posted_date) {
-            const postedTime = new Date(post.posted_date).getTime();
-            const daysSince = (now - postedTime) / (1000 * 60 * 60 * 24);
+        const daysSince = getInternPostAgeDays(post.posted_date, now);
+        if (daysSince !== null) {
             if (daysSince <= 7) breakdown.recency = 15;
             else if (daysSince <= 14) breakdown.recency = 10;
             else if (daysSince <= 30) breakdown.recency = 5;

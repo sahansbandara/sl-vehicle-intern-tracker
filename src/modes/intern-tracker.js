@@ -5,7 +5,7 @@ import { scrapeXpressJobs } from '../scrapers/xpress-jobs.js';
 import { scrapeItproJobs } from '../scrapers/itpro-jobs.js';
 import { scrapeLinkedinJobs } from '../scrapers/linkedin-jobs.js';
 import { dedupeInternPosts } from '../utils/dedupe.js';
-import { scoreInternPosts } from '../utils/score.js';
+import { filterRecentInternPosts, scoreInternPosts } from '../utils/score.js';
 import { sendInternAlert, sendOpsAlert } from '../utils/telegram.js';
 import { persistInternDataset, persistInternSnapshot } from '../utils/storage.js';
 
@@ -30,12 +30,14 @@ export async function runInternTracker({
     chatId,
     opsChatId,
     maxPagesPerSite = 5,
+    maxPostAgeDays = 14,
     sitesEnabled = ['topjobs', 'xpress-jobs', 'ikman-jobs', 'itpro', 'linkedin'],
     keywords = DEFAULT_KEYWORDS,
 }) {
     log.info('Starting IT intern tracker', {
         sites: sitesEnabled,
         maxPagesPerSite,
+        maxPostAgeDays,
         keywordCount: keywords.length,
     });
 
@@ -88,8 +90,24 @@ export async function runInternTracker({
     const deduped = dedupeInternPosts(allPosts);
     log.info(`After dedupe: ${deduped.length} unique intern posts`);
 
+    // Hard internship-only filter: the intern channel should never receive regular jobs.
+    const internOnlyPosts = deduped.filter(post => post.is_intern === true);
+    const nonInternFilteredOut = deduped.length - internOnlyPosts.length;
+    log.info(`Strict internship filter kept ${internOnlyPosts.length} posts; removed non-intern roles: ${nonInternFilteredOut}`);
+
+    // Hard recency filter: only keep posts from the configured recent window.
+    const recentPosts = filterRecentInternPosts(internOnlyPosts, { maxAgeDays: maxPostAgeDays });
+    const staleFilteredOut = internOnlyPosts.length - recentPosts.length;
+    log.info(`Recent intern posts (<= ${maxPostAgeDays} days old): ${recentPosts.length}; filtered out stale/undated: ${staleFilteredOut}`);
+
+    if (recentPosts.length === 0) {
+        log.warning(`Zero recent intern posts within ${maxPostAgeDays} days across all sites.`);
+        await sendOpsAlert(botToken, opsChatId, `⚠️ Intern tracker found 0 posts within the last ${maxPostAgeDays} days. Older and undated posts were filtered out.`);
+        return { scraperReport, alertsSent: 0 };
+    }
+
     // Score
-    const scored = scoreInternPosts(deduped);
+    const scored = scoreInternPosts(recentPosts);
 
     // Sort by relevance (highest first)
     scored.sort((a, b) => b.relevance_score - a.relevance_score);
@@ -135,7 +153,9 @@ export async function runInternTracker({
         `📊 Sources:`,
         ...Object.entries(scraperReport).map(([site, count]) => `  • ${site}: ${count}`),
         ``,
-        `🔢 Raw: ${allPosts.length} → Unique: ${deduped.length}`,
+        `🔢 Raw: ${allPosts.length} → Unique: ${deduped.length} → Internship-only: ${internOnlyPosts.length} → Recent (<=${maxPostAgeDays}d): ${recentPosts.length}`,
+        `🧹 Filtered non-intern: ${nonInternFilteredOut}`,
+        `🧹 Filtered stale/undated: ${staleFilteredOut}`,
         `🔔 New alerts sent: ${alertsSent}`,
         `💾 Dataset + snapshot persisted`,
     ].join('\n');

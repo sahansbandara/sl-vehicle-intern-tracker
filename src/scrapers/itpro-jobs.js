@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { log } from 'apify';
+import { parsePostedDate } from '../utils/normalize.js';
 
 const BASE_URL = 'https://www.itpro.lk';
 
@@ -93,9 +94,8 @@ export async function scrapeItproJobs({ maxPages = 5, keywords = [] } = {}) {
             const isIntern = /intern|trainee|apprentice|attachment|industrial training|placement/i.test(fullText);
             const isIT = matchesITKeywords(fullText, keywords);
 
-            // ITPro.lk is already IT-focused, so we mainly filter for intern/trainee
-            // But also include all IT jobs if they match keywords
-            if (!isIT && !isIntern) return;
+            // This pipeline is strictly for IT internships/trainees only.
+            if (!isIntern || !isIT) return;
 
             const fullUrl = link ? new URL(link, BASE_URL).href : usedUrl;
 
@@ -124,7 +124,7 @@ export async function scrapeItproJobs({ maxPages = 5, keywords = [] } = {}) {
                 salary_range: salaryText || null,
                 field,
                 is_intern: isIntern,
-                posted_date: dateText || null,
+                posted_date: parsePostedDate(dateText),
                 deadline: null,
                 qualifications: [],
                 description: description.substring(0, 500) || null,

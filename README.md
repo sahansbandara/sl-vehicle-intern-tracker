@@ -150,6 +150,7 @@ MAX_PAGES_PER_SITE=10
 NEWS_ENABLED=true
 
 INTERN_MAX_PAGES_PER_SITE=5
+INTERN_MAX_POST_AGE_DAYS=14
 ```
 
 ### 4. Run locally
@@ -198,6 +199,7 @@ code defaults.
 | `DEALER_BRANDS` | `[]` (all 11) | Official dealer brands to scrape |
 | `NEWS_ENABLED` | `true` | Enable vehicle news monitoring |
 | `INTERN_MAX_PAGES_PER_SITE` | `5` | Max pages per intern site |
+| `INTERN_MAX_POST_AGE_DAYS` | `14` | Only keep internship posts newer than this many days |
 | `INTERN_SITES_ENABLED` | 5 sites | Intern job board sites |
 | `INTERN_KEYWORDS` | 30 keywords | IT filter keyword list |
 
@@ -234,6 +236,7 @@ apify push
   "DEALER_BRANDS": [],
   "NEWS_ENABLED": true,
   "INTERN_MAX_PAGES_PER_SITE": 5,
+  "INTERN_MAX_POST_AGE_DAYS": 14,
   "INTERN_SITES_ENABLED": [
     "topjobs",
     "xpress-jobs",
@@ -267,9 +270,11 @@ Configure schedules from the Apify Console after the first successful push.
    - official dealer scraping
    - vehicle-news scraping
 5. Intern mode scrapes internship sources using the configured keyword list.
-6. Marketplace listings are filtered by price band and minimum model
+6. Only actual internship/trainee posts are eligible for the intern channel.
+7. Internship posts older than the configured age window are dropped before persistence and alerting.
+8. Marketplace listings are filtered by price band and minimum model
    year before alerting.
-7. The actor deduplicates results, scores them, persists them, sends
+9. The actor deduplicates results, scores them, persists them, sends
    only unseen alerts, then prunes old alerted IDs after 30 days.
 
 ### Vehicle Scoring
@@ -293,7 +298,7 @@ Internship posts are scored from `0` to `100` using:
 - qualification richness
 - active deadline
 - location presence
-- recency (posts within 7 days get highest boost)
+- recency (posts within 7 days get highest boost, but only posts from the last 14 days are eligible by default)
 
 ### Deduplication
 

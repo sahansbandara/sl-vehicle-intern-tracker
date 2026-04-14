@@ -43,6 +43,7 @@
         "duration": { "type": "string" },
         "qualifications": { "type": "array" },
         "field": { "type": "string" },
+        "is_intern": { "type": "boolean" },
         "deadline": { "type": "string" },
         "relevance_score": { "type": "number" }
       },
