@@ -1,0 +1,108 @@
+{
+  "actorSpecification": 1,
+  "name": "sl-vehicle-intern-tracker",
+  "title": "Sri Lanka Vehicle & IT Intern Tracker v3.0",
+  "description": "Daily scraper for 25+ Sri Lankan sources — official dealer sites (11 brands), car marketplaces (6 sites), vehicle news (7 sites), and IT internship postings (5 job boards) — with unified Telegram alerts using hashtag categorization.",
+  "version": "3.0",
+  "buildTag": "latest",
+  "meta": {
+    "templateId": "sl-tracker",
+    "generatedBy": "Antigravity"
+  },
+  "input": "../INPUT_SCHEMA.json",
+  "dockerfile": "../Dockerfile",
+  "scripts": {
+    "run": "npm start"
+  },
+  "storages": {
+    "dataset": {
+      "actorSpecification": 1,
+      "fields": {
+        "id": { "type": "string" },
+        "source": { "type": "string" },
+        "url": { "type": "string" },
+        "title": { "type": "string" },
+        "price_lkr": { "type": "integer" },
+        "year": { "type": "integer" },
+        "mileage_km": { "type": "integer" },
+        "location": { "type": "string" },
+        "condition": { "type": "string" },
+        "trim": { "type": "string" },
+        "images": { "type": "array" },
+        "seller_type": { "type": "string" },
+        "posted_date": { "type": "string" },
+        "scraped_at": { "type": "string" },
+        "deal_score": { "type": "number" },
+        "brand": { "type": "string" },
+        "model": { "type": "string" },
+        "price_raw": { "type": "string" },
+        "category": { "type": "string" },
+        "summary": { "type": "string" },
+        "company": { "type": "string" },
+        "salary_range": { "type": "string" },
+        "duration": { "type": "string" },
+        "qualifications": { "type": "array" },
+        "field": { "type": "string" },
+        "deadline": { "type": "string" },
+        "relevance_score": { "type": "number" }
+      },
+      "views": {
+        "top_deals": {
+          "title": "Vehicle Budget Matches",
+          "description": "Vehicle listings at or under the configured price cap, sorted by deal_score descending",
+          "transformation": {
+            "fields": ["title", "price_lkr", "year", "mileage_km", "location", "trim", "deal_score", "source", "url"]
+          },
+          "display": {
+            "component": "table",
+            "properties": {
+              "deal_score": { "label": "Score" },
+              "price_lkr": { "label": "Price (LKR)", "format": "number" }
+            }
+          }
+        },
+        "dealer_models": {
+          "title": "Official Dealer Models",
+          "description": "Official brand-new vehicle models and their prices from authorized Sri Lankan dealers",
+          "transformation": {
+            "fields": ["brand", "model", "price_lkr", "price_raw", "source", "url"]
+          },
+          "display": {
+            "component": "table",
+            "properties": {
+              "brand": { "label": "Brand" },
+              "price_lkr": { "label": "Price (LKR)", "format": "number" }
+            }
+          }
+        },
+        "vehicle_news": {
+          "title": "Vehicle News & Updates",
+          "description": "Vehicle-related news articles about tax changes, import rules, new launches, and price updates",
+          "transformation": {
+            "fields": ["title", "category", "source", "date", "url"]
+          },
+          "display": {
+            "component": "table",
+            "properties": {
+              "category": { "label": "Category" }
+            }
+          }
+        },
+        "intern_posts": {
+          "title": "IT Intern Postings",
+          "description": "IT internship postings sorted by relevance_score descending",
+          "transformation": {
+            "fields": ["title", "company", "salary_range", "location", "field", "qualifications", "relevance_score", "source", "url"]
+          },
+          "display": {
+            "component": "table",
+            "properties": {
+              "relevance_score": { "label": "Relevance" },
+              "company": { "label": "Company" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

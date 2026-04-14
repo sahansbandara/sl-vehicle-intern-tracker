@@ -1,0 +1,105 @@
+{
+  "title": "Sri Lanka Vehicle & IT Intern Tracker v3.0 Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "TELEGRAM_BOT_TOKEN": {
+      "title": "Telegram Bot Token",
+      "type": "string",
+      "description": "Bot token from @BotFather",
+      "editor": "textfield",
+      "isSecret": true
+    },
+    "TELEGRAM_CHAT_ID": {
+      "title": "Telegram Chat ID",
+      "type": "string",
+      "description": "Target channel/chat ID",
+      "editor": "textfield"
+    },
+    "TELEGRAM_OPS_CHAT_ID": {
+      "title": "Telegram Ops Alert Chat ID (optional)",
+      "type": "string",
+      "description": "Separate channel for scraper health alerts. Falls back to main chat.",
+      "editor": "textfield",
+      "nullable": true
+    },
+    "MODE": {
+      "title": "Tracker Mode",
+      "type": "string",
+      "description": "'vehicles', 'interns', or 'both'",
+      "editor": "select",
+      "enum": ["vehicles", "interns", "both"],
+      "default": "both"
+    },
+    "MAX_PRICE_LKR": {
+      "title": "Maximum Vehicle Price (LKR)",
+      "type": "integer",
+      "description": "Budget cap for vehicle alerts",
+      "default": 30000000,
+      "minimum": 100000,
+      "maximum": 500000000
+    },
+    "MAX_PAGES_PER_SITE": {
+      "title": "Max Pages Per Vehicle Market Site",
+      "type": "integer",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 100
+    },
+    "SITES_ENABLED": {
+      "title": "Vehicle Market Sites Enabled",
+      "type": "array",
+      "editor": "select",
+      "items": {
+        "type": "string",
+        "enum": ["ikman", "riyasewana", "patpat", "autodirect", "cartivate", "autolanka"]
+      },
+      "default": ["ikman", "patpat", "autodirect", "cartivate", "autolanka"],
+      "uniqueItems": true
+    },
+    "DEALER_BRANDS": {
+      "title": "Official Dealer Brands (empty = all)",
+      "type": "array",
+      "description": "Which official dealer brands to scrape. Leave empty for all 11.",
+      "editor": "select",
+      "items": {
+        "type": "string",
+        "enum": ["MG", "BYD", "Toyota", "Hyundai", "Suzuki", "Kia", "Nissan", "Tata", "DIMO", "United Motors", "BAIC"]
+      },
+      "default": [],
+      "uniqueItems": true
+    },
+    "NEWS_ENABLED": {
+      "title": "Enable Vehicle News Monitoring",
+      "type": "boolean",
+      "description": "Monitor news sites for tax/price/import updates",
+      "default": true
+    },
+    "INTERN_MAX_PAGES_PER_SITE": {
+      "title": "Max Pages Per Intern Site",
+      "type": "integer",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 50
+    },
+    "INTERN_SITES_ENABLED": {
+      "title": "Intern Sites Enabled",
+      "type": "array",
+      "editor": "select",
+      "items": {
+        "type": "string",
+        "enum": ["topjobs", "ikman-jobs", "xpress-jobs", "itpro", "linkedin"]
+      },
+      "default": ["topjobs", "xpress-jobs", "ikman-jobs", "itpro", "linkedin"],
+      "uniqueItems": true
+    },
+    "INTERN_KEYWORDS": {
+      "title": "IT Intern Keywords",
+      "type": "array",
+      "editor": "json",
+      "items": { "type": "string" },
+      "default": ["IT", "Software", "Web", "Mobile", "Developer", "Engineering", "Data", "AI", "Machine Learning", "DevOps", "Cloud", "QA", "Testing", "UI", "UX", "Database", "Networking", "Cybersecurity", "Security", "System Administration", "Computer Science", "Full Stack", "Frontend", "Backend"]
+    }
+  },
+  "required": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]
+}
