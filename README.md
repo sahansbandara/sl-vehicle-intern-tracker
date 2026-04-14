@@ -1,4 +1,4 @@
-# Sri Lanka Vehicle & IT Intern Tracker
+# 🇱🇰 Sri Lanka Vehicle & IT Intern Tracker
 
 An `Apify` actor that monitors Sri Lankan vehicle marketplaces,
 official dealer catalogs, vehicle-news sources, and IT internship
@@ -11,20 +11,20 @@ The actor supports three operating modes:
 - `interns` for IT internship and trainee postings
 - `both` to run everything in one execution
 
-## What The Actor Does
+## ✨ What The Actor Does
 
-- Scrapes 6 vehicle marketplace sources, with 5 enabled by default
-- Scrapes 11 official Sri Lankan dealer brand catalogs
-- Scrapes 7 vehicle-news sources for tax, import, price, and launch updates
-- Scrapes 5 internship/job sources for IT-focused intern and trainee roles
-- Sends alerts to separate vehicle and intern Telegram channels
+- Scrapes **6 vehicle marketplace** sources, with 5 enabled by default
+- Scrapes **11 official Sri Lankan dealer** brand catalogs
+- Scrapes **7 vehicle-news** sources for tax, import, price, and launch updates
+- Scrapes **5 internship/job** sources for IT-focused intern and trainee roles
+- Sends alerts to **separate** vehicle and intern Telegram channels
 - Sends scraper-health summaries and failures to an optional ops channel
 - Filters used-market alerts to vehicles from 2022 onward by default
 - Deduplicates listings/posts across sources with fuzzy matching
 - Scores vehicle deals and internship relevance before alerting
 - Persists datasets and daily snapshots inside Apify storages
 
-## Tech Stack
+## 🛠 Tech Stack
 
 | Area | Implementation |
 | --- | --- |
@@ -35,9 +35,9 @@ The actor supports three operating modes:
 | Deduplication | `fast-levenshtein` + heuristic matching |
 | Packaging | Docker (`apify/actor-node-playwright-chrome:20`) |
 
-## Source Coverage
+## 📡 Source Coverage
 
-### Vehicle marketplaces
+### Vehicle Marketplaces
 
 The codebase contains 6 marketplace scrapers:
 
@@ -50,14 +50,14 @@ The codebase contains 6 marketplace scrapers:
 | `cartivate` | `cartivatemotors.lk` | Yes |
 | `autolanka` | `autolanka.com` | Yes |
 
-### Official dealer brands
+### Official Dealer Brands
 
 When `DEALER_BRANDS` is empty, the actor scrapes all supported brands:
 
 `MG`, `BYD`, `Toyota`, `Hyundai`, `Suzuki`, `Kia`, `Nissan`,
 `Tata`, `DIMO`, `United Motors`, `BAIC`
 
-### Vehicle news sources
+### Vehicle News Sources
 
 | Source | Label |
 | --- | --- |
@@ -69,13 +69,19 @@ When `DEALER_BRANDS` is empty, the actor scrapes all supported brands:
 | `EconomyNext` | EconomyNext |
 | `AutoLankaNews` | AutoLanka News |
 
-### Internship sources
+### Internship Sources
 
 All 5 intern scrapers are enabled by default:
 
-`topjobs`, `xpress-jobs`, `ikman-jobs`, `itpro`, `linkedin`
+| Source key | Site | Notes |
+| --- | --- | --- |
+| `topjobs` | topjobs.lk | Popular Sri Lankan job board |
+| `xpress-jobs` | xpress.jobs | IT job aggregator |
+| `ikman-jobs` | ikman.lk (jobs section) | General classifieds |
+| `itpro` | itpro.lk | Niche IT job board |
+| `linkedin` | linkedin.com (public) | Anti-blocking with rotating UAs |
 
-## Telegram Routing
+## 📢 Telegram Routing
 
 The actor supports separate channels for each alert stream:
 
@@ -97,7 +103,7 @@ Typical hashtag patterns sent by the actor:
 - Vehicle news alerts: `#vehiclenews #<category>`
 - Internship alerts: `#intern #IT #<field>`
 
-## Prerequisites
+## 🚀 Prerequisites
 
 - Node.js 20 or newer
 - npm
@@ -106,7 +112,7 @@ Typical hashtag patterns sent by the actor:
 - An Apify account only if you want cloud deployment or Apify storage
   in production
 
-## Local Development
+## 💻 Local Development
 
 ### 1. Clone the repository
 
@@ -171,50 +177,31 @@ Notes:
 - If `MODE=both` but only one content channel is configured, the missing
   mode is skipped and logged as an error
 
-## Configuration Reference
+## ⚙️ Configuration Reference
 
 The runtime merges Apify input with environment variables and applies
 code defaults.
 
-- `TELEGRAM_BOT_TOKEN`:
-  required bot token
-- `TELEGRAM_VEHICLE_CHAT_ID`:
-  required for `vehicles` mode
-- `TELEGRAM_INTERN_CHAT_ID`:
-  required for `interns` mode
-- `TELEGRAM_OPS_CHAT_ID`:
-  optional ops channel, defaults to the vehicle channel
-- `TELEGRAM_CHAT_ID`:
-  legacy fallback for both content channels
-- `MODE`:
-  defaults to `both`; valid values are `vehicles`, `interns`, or `both`
-- `MIN_PRICE_LKR`:
-  defaults to `10000000`
-- `MAX_PRICE_LKR`:
-  defaults to `500000000`
-- `MIN_VEHICLE_YEAR`:
-  defaults to `2022`; marketplace listings older than this, or missing
-  a year, are excluded
-- `MAX_PAGES_PER_SITE`:
-  defaults to `10`
-- `SITES_ENABLED`:
-  defaults to `["ikman","patpat","autodirect","cartivate","autolanka"]`
-- `DEALER_BRANDS`:
-  defaults to `[]`, which means all 11 brands
-- `NEWS_ENABLED`:
-  defaults to `true`
-- `INTERN_MAX_PAGES_PER_SITE`:
-  defaults to `5`
-- `INTERN_SITES_ENABLED`:
-  defaults to `["topjobs","xpress-jobs","ikman-jobs","itpro","linkedin"]`
-- `INTERN_KEYWORDS`:
-  defaults to the built-in IT keyword list
+| Variable | Default | Description |
+| --- | --- | --- |
+| `TELEGRAM_BOT_TOKEN` | — | **Required.** Bot token |
+| `TELEGRAM_VEHICLE_CHAT_ID` | — | Required for `vehicles` mode |
+| `TELEGRAM_INTERN_CHAT_ID` | — | Required for `interns` mode |
+| `TELEGRAM_OPS_CHAT_ID` | vehicle channel | Optional ops channel |
+| `TELEGRAM_CHAT_ID` | — | Legacy fallback for both channels |
+| `MODE` | `both` | `vehicles`, `interns`, or `both` |
+| `MIN_PRICE_LKR` | `10000000` | Minimum vehicle price filter |
+| `MAX_PRICE_LKR` | `500000000` | Maximum vehicle price filter |
+| `MIN_VEHICLE_YEAR` | `2022` | Minimum model year filter |
+| `MAX_PAGES_PER_SITE` | `10` | Max pages per market site |
+| `SITES_ENABLED` | 5 sites | Vehicle marketplace sites |
+| `DEALER_BRANDS` | `[]` (all 11) | Official dealer brands to scrape |
+| `NEWS_ENABLED` | `true` | Enable vehicle news monitoring |
+| `INTERN_MAX_PAGES_PER_SITE` | `5` | Max pages per intern site |
+| `INTERN_SITES_ENABLED` | 5 sites | Intern job board sites |
+| `INTERN_KEYWORDS` | 30 keywords | IT filter keyword list |
 
-There is also backward-compatible support in code for
-`PRICE_ALERT_THRESHOLD_LKR`, but `MAX_PRICE_LKR` is the current
-documented input.
-
-## Apify Usage
+## ☁️ Apify Usage
 
 ### Push the actor
 
@@ -268,9 +255,9 @@ Common Apify schedules for this actor:
 
 Configure schedules from the Apify Console after the first successful push.
 
-## How It Works
+## 🔍 How It Works
 
-### Execution flow
+### Execution Flow
 
 1. `src/main.js` initializes the actor and loads input from Apify.
 2. Local `.env` values are used as fallbacks when running outside Apify.
@@ -285,7 +272,7 @@ Configure schedules from the Apify Console after the first successful push.
 7. The actor deduplicates results, scores them, persists them, sends
    only unseen alerts, then prunes old alerted IDs after 30 days.
 
-### Vehicle scoring
+### Vehicle Scoring
 
 Vehicle listings are scored from `0` to `100` using:
 
@@ -295,18 +282,18 @@ Vehicle listings are scored from `0` to `100` using:
 - trim bonus
 - condition bonus
 
-### Internship scoring
+### Internship Scoring
 
 Internship posts are scored from `0` to `100` using:
 
-- field specificity
+- field specificity (Software Engineering, Cybersecurity, etc.)
 - company presence
 - salary availability
 - duration availability
 - qualification richness
 - active deadline
 - location presence
-- recency
+- recency (posts within 7 days get highest boost)
 
 ### Deduplication
 
@@ -316,7 +303,17 @@ The actor uses fuzzy matching with `fast-levenshtein` plus source-specific heuri
   proximity, location, and year
 - Internship duplicates consider normalized title similarity, company, and location
 
-## Output Storage
+### LinkedIn Anti-Blocking
+
+The LinkedIn scraper uses several strategies to avoid being blocked:
+
+- **Rotating User-Agent** strings from a pool of 6 realistic browser UAs
+- **Exponential backoff** on 429/403 responses
+- **Random delays** between requests (3–6s within queries, 2–5s between queries)
+- **Consecutive block detection** — stops after 3 consecutive blocked queries to avoid IP bans
+- **Multiple endpoints** — tries guest API first, falls back to public search page
+
+## 💾 Output Storage
 
 The actor writes to multiple Apify storages:
 
@@ -329,7 +326,7 @@ The actor writes to multiple Apify storages:
 | `vehicle-news` | vehicle-news articles |
 | `intern-posts` | scored internship posts |
 
-### Key-value stores
+### Key-Value Stores
 
 | Store | Purpose |
 | --- | --- |
@@ -345,7 +342,7 @@ The actor writes to multiple Apify storages:
 Every snapshot store also keeps a `latest` key for convenient access to
 the most recent run.
 
-## Project Structure
+## 📁 Project Structure
 
 ```text
 .
@@ -381,7 +378,7 @@ the most recent run.
 └── README.md
 ```
 
-## Operational Notes
+## ⚠️ Operational Notes
 
 - Zero-result scrapes trigger an ops warning so selector breakages are
   visible quickly.
@@ -390,9 +387,9 @@ the most recent run.
   add it explicitly if you want it.
 - The Docker image uses Apify's Playwright base image, but the current
   scraper implementation is Axios/Cheerio-driven.
-- There is no automated test suite or lint task defined in
-  `package.json` at the moment.
+- LinkedIn may still block requests despite anti-blocking measures;
+  the scraper degrades gracefully and reports what it could fetch.
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License. See `LICENSE` for details.

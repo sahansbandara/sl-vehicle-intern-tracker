@@ -1,6 +1,6 @@
-# Project Brain — Sri Lanka Vehicle & IT Intern Tracker v3.0
+# Project Brain — Sri Lanka Vehicle & IT Intern Tracker v3.1
 
-> **Apify Actor** that scrapes **25+ Sri Lankan sources** for vehicles under budget, official dealer prices, vehicle news, and IT internship postings — all routed to one Telegram channel with hashtag-based categorization.
+> **Apify Actor** that scrapes **25+ Sri Lankan sources** for vehicles under budget, official dealer prices, vehicle news, and IT internship postings — routed to **separate Telegram channels** with hashtag-based categorization.
 
 ## Stack
 
@@ -36,12 +36,12 @@ node --check src/*.js src/**/*.js  # Syntax validation
 
 ```
 .
-├── .actor/actor.json          # Apify actor config (v3.0)
+├── .actor/actor.json          # Apify actor config (v3.1)
 ├── .env.example               # Environment variable template
 ├── .gitignore                 # Ignores .env, node_modules, storage
 ├── Dockerfile                 # Apify Docker build
 ├── INPUT_SCHEMA.json          # Apify input schema (all toggles)
-├── package.json               # Node.js config (v3.0.0)
+├── package.json               # Node.js config (v3.1.0)
 ├── README.md                  # Full deployment guide
 ├── CLAUDE.md                  # This file — agent context
 ├── src/
@@ -62,7 +62,7 @@ node --check src/*.js src/**/*.js  # Syntax validation
 │   │   ├── ikman-jobs.js      # ikman.lk jobs section scraper
 │   │   ├── xpress-jobs.js     # xpress.jobs IT intern scraper
 │   │   ├── itpro-jobs.js      # itpro.lk niche IT board scraper
-│   │   └── linkedin-jobs.js   # LinkedIn public job search scraper
+│   │   └── linkedin-jobs.js   # LinkedIn public job search (anti-blocking v2)
 │   └── utils/
 │       ├── dedupe.js          # Cross-source dedup (vehicle + intern)
 │       ├── normalize.js       # Data normalization (vehicle + intern)
@@ -96,16 +96,17 @@ INPUT → main.js (mode select: vehicles | interns | both)
               └── → normalize → dedupe → score → persist → #intern alerts
 ```
 
-## Telegram Hashtag System
+## Telegram Channel Routing
 
-All 4 alert types go to one channel:
+Alerts are sent to **separate** Telegram channels:
 
-| Alert Type | Hashtags | Example |
-|------------|----------|---------|
-| Market listings | `#vehicle #under30M #ikman` | Used car under budget |
-| Official dealers | `#vehicle #official #MG` | MG ZS price from dealer |
-| Vehicle news | `#vehiclenews #taxupdate` | Import duty change article |
-| IT internships | `#intern #IT #Cybersecurity` | Network intern at Dialog |
+| Alert Type | Channel | Hashtags | Example |
+|------------|---------|----------|---------|
+| Market listings | `TELEGRAM_VEHICLE_CHAT_ID` | `#vehicle #over10M #ikman` | Used car under budget |
+| Official dealers | `TELEGRAM_VEHICLE_CHAT_ID` | `#vehicle #official #MG` | MG ZS price from dealer |
+| Vehicle news | `TELEGRAM_VEHICLE_CHAT_ID` | `#vehiclenews #taxupdate` | Import duty change article |
+| IT internships | `TELEGRAM_INTERN_CHAT_ID` | `#intern #IT #Cybersecurity` | Network intern at Dialog |
+| Ops alerts | `TELEGRAM_OPS_CHAT_ID` | (plain text) | Scraper failure warning |
 
 ## Data Storage (Apify Datasets)
 
@@ -122,6 +123,12 @@ All 4 alert types go to one channel:
 - `vehicle-news-history`
 - `intern-tracker-history`
 
+**Alert dedup stores** (prevent duplicate Telegram alerts):
+- `alerted-listings` — vehicle marketplace IDs
+- `alerted-dealer-models` — dealer model IDs
+- `alerted-news` — news article IDs
+- `alerted-intern-posts` — intern post IDs (pruned after 30 days)
+
 ## Conventions
 
 - ES Modules (`import`/`export`) throughout
@@ -131,20 +138,33 @@ All 4 alert types go to one channel:
 - Deduplication: SHA-1 content IDs + Levenshtein fuzzy title matching
 - Historical snapshots stored daily in Apify Key-Value Store
 - Separate dedup stores per alert category prevent duplicate alerts across runs
+- LinkedIn scraper uses rotating User-Agents, exponential backoff, and consecutive block detection
 
 ## Input Configuration
 
 ### Required
 - `TELEGRAM_BOT_TOKEN` — Bot token from @BotFather
-- `TELEGRAM_CHAT_ID` — Target Telegram chat/channel ID
+- `TELEGRAM_VEHICLE_CHAT_ID` — Vehicle alert channel ID
+- `TELEGRAM_INTERN_CHAT_ID` — Intern alert channel ID
 
 ### Optional
+- `TELEGRAM_OPS_CHAT_ID` — Ops channel (default: vehicle channel)
+- `TELEGRAM_CHAT_ID` — Legacy fallback for both channels
 - `MODE` — `"vehicles"`, `"interns"`, or `"both"` (default: `"both"`)
-- `MAX_PRICE_LKR` — Vehicle budget cap (default: 30,000,000)
+- `MIN_PRICE_LKR` — Min vehicle price (default: 10,000,000)
+- `MAX_PRICE_LKR` — Max vehicle price (default: 500,000,000)
+- `MIN_VEHICLE_YEAR` — Minimum model year filter (default: 2022)
 - `MAX_PAGES_PER_SITE` — Max pages per market site (default: 10)
 - `SITES_ENABLED` — Market sites (default: `["ikman", "patpat", "autodirect", "cartivate", "autolanka"]`)
 - `DEALER_BRANDS` — Official dealer brands, empty = all 11 (default: `[]`)
 - `NEWS_ENABLED` — Enable vehicle news monitoring (default: `true`)
+- `INTERN_MAX_PAGES_PER_SITE` — Max pages per intern site (default: 5)
 - `INTERN_SITES_ENABLED` — Intern sites (default: `["topjobs", "xpress-jobs", "ikman-jobs", "itpro", "linkedin"]`)
-- `INTERN_KEYWORDS` — IT filter keywords (default: 34 keywords covering all IT subfields)
-- `TELEGRAM_OPS_CHAT_ID` — Separate ops alert channel (default: falls back to main chat)
+- `INTERN_KEYWORDS` — IT filter keywords (default: 30 keywords covering all IT subfields)
+
+## Known Issues & Solutions
+
+- **LinkedIn blocking**: LinkedIn aggressively rate-limits scraping. The scraper now uses rotating UAs, exponential backoff, and stops after 3 consecutive blocks to avoid IP bans.
+- **Cartivate/AutoLanka failures**: These sites may change URLs or go down. The scraper logs `ALL_URLS_FAILED` and continues gracefully.
+- **Dealer sites failing**: Many dealer websites are poorly maintained; the scraper tries multiple URL patterns per brand.
+- **ITPro returns non-intern IT jobs**: By design — all IT positions are included since the site is IT-focused. The scoring system ranks true intern roles higher.

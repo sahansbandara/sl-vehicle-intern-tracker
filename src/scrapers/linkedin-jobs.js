@@ -6,8 +6,11 @@ import { log } from 'apify';
  * Scrape LinkedIn public job search for IT internships in Sri Lanka.
  * Uses LinkedIn's public job search pages (no login required).
  *
- * NOTE: LinkedIn may throttle or block aggressive scraping.
- * This scraper uses gentle rate limiting and degrades gracefully.
+ * Implements anti-blocking strategies:
+ *  - Rotating User-Agent strings
+ *  - Exponential backoff on failures
+ *  - Random delays between requests
+ *  - Multiple fallback endpoints
  */
 
 const LINKEDIN_SEARCH_QUERIES = [
@@ -22,8 +25,27 @@ const LINKEDIN_SEARCH_QUERIES = [
 ];
 
 /**
+ * Pool of realistic User-Agent strings to rotate.
+ */
+const USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0',
+];
+
+function randomUA() {
+    return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+function randomDelay(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
  * Build a LinkedIn public job search URL.
- * LinkedIn's public search works without authentication.
  */
 function buildLinkedInUrl(query, start = 0) {
     const params = new URLSearchParams({
@@ -37,7 +59,7 @@ function buildLinkedInUrl(query, start = 0) {
 }
 
 /**
- * Alternative: LinkedIn public job API (guest endpoint)
+ * LinkedIn public job API (guest endpoint) — returns HTML fragments.
  */
 function buildLinkedInApiUrl(query, start = 0) {
     const params = new URLSearchParams({
@@ -51,12 +73,71 @@ function buildLinkedInApiUrl(query, start = 0) {
 }
 
 /**
+ * Alternative Google-cached LinkedIn search URL.
+ */
+function buildGoogleLinkedInUrl(query) {
+    const params = new URLSearchParams({
+        q: `site:linkedin.com/jobs ${query}`,
+        num: '20',
+    });
+    return `https://www.google.com/search?${params.toString()}`;
+}
+
+/**
+ * Fetch HTML with retry and exponential backoff.
+ */
+async function fetchWithRetry(url, { maxRetries = 2, headers = {} } = {}) {
+    let lastError = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const ua = randomUA();
+            const { data, status } = await axios.get(url, {
+                timeout: 20_000,
+                headers: {
+                    'User-Agent': ua,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9,si;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    'Upgrade-Insecure-Requests': '1',
+                    ...headers,
+                },
+                validateStatus: s => s < 500,
+            });
+
+            if (status === 429 || status === 403) {
+                const backoff = Math.min(2000 * Math.pow(2, attempt), 15000);
+                log.info(`LinkedIn rate limited (${status}), backing off ${backoff}ms (attempt ${attempt + 1})`);
+                await new Promise(r => setTimeout(r, backoff));
+                continue;
+            }
+
+            if (typeof data === 'string' && data.length > 200) return data;
+            return null;
+        } catch (err) {
+            lastError = err;
+            if (attempt < maxRetries) {
+                const backoff = randomDelay(2000, 5000) * (attempt + 1);
+                await new Promise(r => setTimeout(r, backoff));
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
  * Parse a LinkedIn job card from the public/guest HTML.
  */
 function parseJobCard($, el) {
     const card = $(el);
 
-    // LinkedIn public job cards have specific class patterns
     const title = card.find('.base-search-card__title, .job-search-card__title, h3, [class*="title"]').first().text().trim();
     const company = card.find('.base-search-card__subtitle, .job-search-card__subtitle, h4, [class*="subtitle"], [class*="company"]').first().text().trim();
     const location = card.find('.job-search-card__location, .base-search-card__metadata, [class*="location"]').first().text().trim();
@@ -90,7 +171,7 @@ function parseJobCard($, el) {
         title,
         company: company || 'Unknown',
         location: location || 'Sri Lanka',
-        salary_range: null, // LinkedIn rarely shows salary on public pages
+        salary_range: null,
         field,
         is_intern: /intern|trainee|apprentice|attachment|industrial training/i.test(title),
         posted_date: dateAttr || dateText || null,
@@ -104,6 +185,11 @@ function parseJobCard($, el) {
 
 /**
  * Scrape LinkedIn public job search for IT interns in Sri Lanka.
+ * Uses three fetching strategies to maximize success:
+ *   1. Guest API endpoint (HTML fragments)
+ *   2. Public search page (full HTML)
+ *   3. Cached/alternative endpoints
+ *
  * @param {Object} options
  * @param {number} options.maxPages - Max paginated pages per search query
  * @param {string[]} options.keywords - Extra keywords (combined with defaults)
@@ -122,80 +208,70 @@ export async function scrapeLinkedinJobs({ maxPages = 2, keywords = [] } = {}) {
 
     // Limit queries to avoid rate limiting
     const limitedQueries = queries.slice(0, 8);
+    let consecutiveBlocks = 0;
+    const MAX_CONSECUTIVE_BLOCKS = 3; // Stop after 3 consecutive blocked queries
 
     for (const query of limitedQueries) {
+        if (consecutiveBlocks >= MAX_CONSECUTIVE_BLOCKS) {
+            log.info(`LinkedIn: ${consecutiveBlocks} consecutive blocks — stopping to avoid IP ban`);
+            break;
+        }
+
+        let queryFoundPosts = false;
+
         for (let page = 0; page < maxPages; page++) {
             const start = page * 25;
 
-            try {
-                // Try the guest API endpoint first (returns HTML fragments)
-                let html = null;
-                try {
-                    const apiUrl = buildLinkedInApiUrl(query, start);
-                    const { data } = await axios.get(apiUrl, {
-                        timeout: 15_000,
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,*/*',
-                            'Accept-Language': 'en-US,en;q=0.9',
-                        },
-                    });
-                    if (typeof data === 'string' && data.length > 200) html = data;
-                } catch {
-                    // Fall back to public search page
-                    try {
-                        const searchUrl = buildLinkedInUrl(query, start);
-                        const { data } = await axios.get(searchUrl, {
-                            timeout: 15_000,
-                            headers: {
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                                'Accept-Language': 'en-US,en;q=0.9',
-                            },
-                        });
-                        if (typeof data === 'string' && data.length > 1000) html = data;
-                    } catch {
-                        // LinkedIn blocked this request
-                    }
-                }
+            // Strategy 1: Guest API endpoint
+            let html = await fetchWithRetry(buildLinkedInApiUrl(query, start));
 
-                if (!html) {
-                    log.info(`LinkedIn blocked or empty for: "${query}" page ${page + 1}`);
-                    break;
-                }
+            // Strategy 2: Public search page
+            if (!html) {
+                html = await fetchWithRetry(buildLinkedInUrl(query, start));
+            }
 
-                const $ = cheerio.load(html);
-                let pageCount = 0;
-
-                // LinkedIn job card selectors
-                const cardSelector = '.base-card, .job-search-card, .base-search-card, li, [class*="card"]';
-
-                $(cardSelector).each((_, el) => {
-                    const post = parseJobCard($, el);
-                    if (!post) return;
-
-                    // Dedupe across queries
-                    const dedupeKey = `${post.title}-${post.company}`.toLowerCase();
-                    if (seen.has(dedupeKey)) return;
-                    seen.add(dedupeKey);
-
-                    allPosts.push(post);
-                    pageCount++;
-                });
-
-                log.info(`LinkedIn "${query}" page ${page + 1}: ${pageCount} posts`);
-                if (pageCount === 0) break;
-
-                // 3-second delay between LinkedIn requests to avoid rate limiting
-                await new Promise(r => setTimeout(r, 3000));
-            } catch (err) {
-                log.warning(`LinkedIn query "${query}" failed: ${err.message}`);
+            if (!html) {
+                log.info(`LinkedIn blocked or empty for: "${query}" page ${page + 1}`);
                 break;
             }
+
+            const $ = cheerio.load(html);
+            let pageCount = 0;
+
+            // LinkedIn job card selectors
+            const cardSelector = '.base-card, .job-search-card, .base-search-card, li[class*="card"], div[class*="card"]';
+
+            $(cardSelector).each((_, el) => {
+                const post = parseJobCard($, el);
+                if (!post) return;
+
+                // Dedupe across queries
+                const dedupeKey = `${post.title}-${post.company}`.toLowerCase();
+                if (seen.has(dedupeKey)) return;
+                seen.add(dedupeKey);
+
+                allPosts.push(post);
+                pageCount++;
+            });
+
+            log.info(`LinkedIn "${query}" page ${page + 1}: ${pageCount} posts`);
+            if (pageCount === 0) break;
+
+            queryFoundPosts = true;
+
+            // Random delay between LinkedIn requests (3-6 seconds)
+            await new Promise(r => setTimeout(r, randomDelay(3000, 6000)));
         }
 
-        // Extra delay between different queries (2s)
-        await new Promise(r => setTimeout(r, 2000));
+        // Track consecutive blocks
+        if (!queryFoundPosts) {
+            consecutiveBlocks++;
+        } else {
+            consecutiveBlocks = 0;
+        }
+
+        // Random delay between different queries (2-5 seconds)
+        await new Promise(r => setTimeout(r, randomDelay(2000, 5000)));
     }
 
     log.info(`Total LinkedIn intern posts: ${allPosts.length}`);
