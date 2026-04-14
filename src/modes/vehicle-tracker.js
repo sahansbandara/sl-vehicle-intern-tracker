@@ -18,7 +18,7 @@ import { persistDataset, persistHistoricalSnapshot, persistDealerDataset, persis
  * 2. Official dealer sites (MG, BYD, Toyota, Hyundai, Suzuki, Kia, Nissan, Tata, DIMO, United Motors, BAIC)
  * 3. News sites (VIASL, Motorguide, Newswire, Daily Mirror, Ada Derana, EconomyNext, AutoLanka)
  *
- * Filters vehicles by MIN_PRICE_LKR (default: 10M) — only shows vehicles OVER 10 million LKR.
+ * Filters used-market listings by price and minimum year.
  */
 export async function runVehicleTracker({
     botToken,
@@ -26,8 +26,9 @@ export async function runVehicleTracker({
     opsChatId,
     minPriceLkr = 10_000_000,
     maxPriceLkr = 500_000_000,
+    minVehicleYear = 2022,
     maxPagesPerSite = 10,
-    sitesEnabled = ['ikman', 'patpat'],
+    sitesEnabled = ['ikman', 'patpat', 'autodirect', 'cartivate', 'autolanka'],
     dealerBrands = [],
     newsEnabled = true,
 }) {
@@ -37,6 +38,7 @@ export async function runVehicleTracker({
         newsEnabled,
         minPriceLkr,
         maxPriceLkr,
+        minVehicleYear,
     });
 
     // ── 1. Market Sites ─────────────────────────────────────────
@@ -113,14 +115,17 @@ export async function runVehicleTracker({
         const deduped = dedupeListings(allMarketListings);
         log.info(`After dedupe: ${deduped.length} unique market listings`);
 
-        // Filter: only vehicles with price >= minPriceLkr (over 10M)
-        const inRange = deduped.filter(l => {
+        // Keep only marketplace listings inside the price band and newer than the minimum year.
+        const inPriceRange = deduped.filter(l => {
             if (!l.price_lkr) return false;
             return l.price_lkr >= minPriceLkr && l.price_lkr <= maxPriceLkr;
         });
-        log.info(`In price range (${minPriceLkr.toLocaleString()} - ${maxPriceLkr.toLocaleString()}): ${inRange.length} listings`);
+        log.info(`In price range (${minPriceLkr.toLocaleString()} - ${maxPriceLkr.toLocaleString()}): ${inPriceRange.length} listings`);
 
-        const scored = scoreListings(inRange);
+        const recentListings = inPriceRange.filter(l => l.year && l.year >= minVehicleYear);
+        log.info(`With year >= ${minVehicleYear}: ${recentListings.length} listings`);
+
+        const scored = scoreListings(recentListings);
         await persistDataset(scored);
         await persistHistoricalSnapshot(scored);
 
@@ -225,6 +230,7 @@ export async function runVehicleTracker({
         `📰 News Articles: ${newsArticles.length}`,
         ``,
         `💰 Price Range: ${minPriceLkr.toLocaleString()} - ${maxPriceLkr.toLocaleString()} LKR`,
+        `📅 Minimum Market Year: ${minVehicleYear}`,
         `📢 Vehicle Channel: ${chatId}`,
         ``,
         `🔔 Alerts Sent:`,

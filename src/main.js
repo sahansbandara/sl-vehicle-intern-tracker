@@ -2,48 +2,89 @@ import { Actor, log } from 'apify';
 import { runVehicleTracker } from './modes/vehicle-tracker.js';
 import { runInternTracker } from './modes/intern-tracker.js';
 
+const DEFAULT_VEHICLE_SITES = ['ikman', 'patpat', 'autodirect', 'cartivate', 'autolanka'];
+const DEFAULT_INTERN_SITES = ['topjobs', 'xpress-jobs', 'ikman-jobs', 'itpro', 'linkedin'];
+const DEFAULT_INTERN_KEYWORDS = [
+    'IT', 'Software', 'Web', 'Mobile', 'Developer', 'Engineering', 'Data',
+    'AI', 'Machine Learning', 'DevOps', 'Cloud', 'QA', 'Testing', 'UI', 'UX',
+    'Database', 'Networking', 'Cybersecurity', 'Security', 'System Administration',
+    'Computer Science', 'Full Stack', 'Frontend', 'Backend', 'Python', 'Java',
+    'React', 'Node.js', 'AWS', 'Azure',
+];
+
 await Actor.init();
 
 const input = await Actor.getInput() ?? {};
 
+function parseInteger(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
+}
+
+function parseBoolean(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'boolean') return value;
+
+    const normalized = String(value).trim().toLowerCase();
+    if (['true', '1', 'yes', 'y'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'n'].includes(normalized)) return false;
+    return null;
+}
+
+function parseStringArray(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (Array.isArray(value)) {
+        const cleaned = value.map(v => String(v).trim()).filter(Boolean);
+        return cleaned.length > 0 ? cleaned : null;
+    }
+
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                const cleaned = parsed.map(v => String(v).trim()).filter(Boolean);
+                return cleaned.length > 0 ? cleaned : null;
+            }
+        } catch {
+            // Fall through to comma-separated parsing.
+        }
+    }
+
+    const cleaned = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+    return cleaned.length > 0 ? cleaned : null;
+}
+
+// Price filters — MIN_PRICE_LKR defaults to 10M, no upper cap.
+const MIN_PRICE_LKR = parseInteger(input.MIN_PRICE_LKR) ?? parseInteger(process.env.MIN_PRICE_LKR) ?? 10_000_000;
+const MAX_PRICE_LKR = parseInteger(input.MAX_PRICE_LKR)
+    ?? parseInteger(input.PRICE_ALERT_THRESHOLD_LKR)
+    ?? parseInteger(process.env.MAX_PRICE_LKR)
+    ?? parseInteger(process.env.PRICE_ALERT_THRESHOLD_LKR)
+    ?? 500_000_000;
+const MIN_VEHICLE_YEAR = parseInteger(input.MIN_VEHICLE_YEAR) ?? parseInteger(process.env.MIN_VEHICLE_YEAR) ?? 2022;
+const MAX_PAGES_PER_SITE = parseInteger(input.MAX_PAGES_PER_SITE) ?? parseInteger(process.env.MAX_PAGES_PER_SITE) ?? 10;
+const SITES_ENABLED = parseStringArray(input.SITES_ENABLED) ?? parseStringArray(process.env.SITES_ENABLED) ?? DEFAULT_VEHICLE_SITES;
+const DEALER_BRANDS = parseStringArray(input.DEALER_BRANDS) ?? parseStringArray(process.env.DEALER_BRANDS) ?? [];
+const NEWS_ENABLED = parseBoolean(input.NEWS_ENABLED) ?? parseBoolean(process.env.NEWS_ENABLED) ?? true;
+
+// Intern tracker config
+const INTERN_MAX_PAGES_PER_SITE = parseInteger(input.INTERN_MAX_PAGES_PER_SITE) ?? parseInteger(process.env.INTERN_MAX_PAGES_PER_SITE) ?? 5;
+const INTERN_SITES_ENABLED = parseStringArray(input.INTERN_SITES_ENABLED) ?? parseStringArray(process.env.INTERN_SITES_ENABLED) ?? DEFAULT_INTERN_SITES;
+const INTERN_KEYWORDS = parseStringArray(input.INTERN_KEYWORDS) ?? parseStringArray(process.env.INTERN_KEYWORDS) ?? DEFAULT_INTERN_KEYWORDS;
+const MODE = input.MODE ?? process.env.MODE ?? 'both';
+
 const {
     TELEGRAM_BOT_TOKEN,
-
-    // Separate channel IDs for vehicles and interns
     TELEGRAM_VEHICLE_CHAT_ID,
     TELEGRAM_INTERN_CHAT_ID,
     TELEGRAM_OPS_CHAT_ID,
-
-    // Legacy single chat ID (fallback)
     TELEGRAM_CHAT_ID,
-
-    // Mode selection: "vehicles", "interns", or "both"
-    MODE = 'both',
-
-    // Vehicle market tracker config
-    MIN_PRICE_LKR: INPUT_MIN_PRICE_LKR,
-    MAX_PRICE_LKR: INPUT_MAX_PRICE_LKR,
-    PRICE_ALERT_THRESHOLD_LKR,
-    MAX_PAGES_PER_SITE = 10,
-    SITES_ENABLED = ['ikman', 'patpat', 'autodirect', 'cartivate', 'autolanka'],
-    DEALER_BRANDS = [],     // Empty = all 11 brands
-    NEWS_ENABLED = true,
-
-    // Intern tracker config
-    INTERN_MAX_PAGES_PER_SITE = 5,
-    INTERN_SITES_ENABLED = ['topjobs', 'xpress-jobs', 'ikman-jobs', 'itpro', 'linkedin'],
-    INTERN_KEYWORDS = [
-        'IT', 'Software', 'Web', 'Mobile', 'Developer', 'Engineering', 'Data',
-        'AI', 'Machine Learning', 'DevOps', 'Cloud', 'QA', 'Testing', 'UI', 'UX',
-        'Database', 'Networking', 'Cybersecurity', 'Security', 'System Administration',
-        'Computer Science', 'Full Stack', 'Frontend', 'Backend', 'Python', 'Java',
-        'React', 'Node.js', 'AWS', 'Azure',
-    ],
 } = input;
-
-// Price filters — MIN_PRICE_LKR defaults to 10M, no upper cap
-const MIN_PRICE_LKR = INPUT_MIN_PRICE_LKR ?? 10_000_000;
-const MAX_PRICE_LKR = INPUT_MAX_PRICE_LKR ?? PRICE_ALERT_THRESHOLD_LKR ?? 500_000_000;
 
 // Local .env fallback
 const botToken = TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
@@ -72,6 +113,7 @@ if (mode === 'vehicles' || mode === 'both') {
                 opsChatId,
                 minPriceLkr: MIN_PRICE_LKR,
                 maxPriceLkr: MAX_PRICE_LKR,
+                minVehicleYear: MIN_VEHICLE_YEAR,
                 maxPagesPerSite: MAX_PAGES_PER_SITE,
                 sitesEnabled: SITES_ENABLED,
                 dealerBrands: DEALER_BRANDS,

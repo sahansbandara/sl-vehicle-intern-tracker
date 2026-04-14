@@ -1,497 +1,398 @@
-<p align="center">
-  <h1 align="center">🇱🇰 Sri Lanka Vehicle & IT Intern Tracker v3.0</h1>
-  <p align="center">
-    <strong>25+ sources • 4 alert categories • One Telegram channel</strong>
-  </p>
-  <p align="center">
-    <img src="https://img.shields.io/badge/Node.js-20+-green?logo=node.js" alt="Node.js 20+">
-    <img src="https://img.shields.io/badge/Apify-Actor%20v3-blue?logo=apify" alt="Apify">
-    <img src="https://img.shields.io/badge/Telegram-Bot%20API-blue?logo=telegram" alt="Telegram">
-    <img src="https://img.shields.io/badge/version-3.0.0-orange" alt="v3.0.0">
-    <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
-  </p>
-</p>
+# Sri Lanka Vehicle & IT Intern Tracker
 
----
+An `Apify` actor that monitors Sri Lankan vehicle marketplaces,
+official dealer catalogs, vehicle-news sources, and IT internship
+job boards, then sends categorized Telegram alerts to dedicated
+channels.
 
-An **Apify Actor** that monitors **25+ Sri Lankan websites** for vehicle prices, official dealer updates, vehicle-related news, and IT internship postings — then sends real-time **Telegram alerts** with hashtag-based categorization to a single channel.
+The actor supports three operating modes:
 
-## 📋 Table of Contents
+- `vehicles` for market listings, official dealer models, and vehicle news
+- `interns` for IT internship and trainee postings
+- `both` to run everything in one execution
 
-- [Features](#-features)
-- [Alert Categories](#-alert-categories)
-- [Sources Monitored](#-sources-monitored)
-- [Quick Start](#-quick-start)
-- [Prerequisites](#-prerequisites)
-- [Local Setup](#-local-setup)
-- [Deploy to Apify Cloud](#-deploy-to-apify-cloud)
-- [Telegram Bot Setup](#-telegram-bot-setup)
-- [Configuration](#-configuration)
-- [Architecture](#-architecture)
-- [Project Structure](#-project-structure)
-- [Data Storage](#-data-storage)
-- [Scheduling](#-scheduling)
-- [Troubleshooting](#-troubleshooting)
-- [License](#-license)
+## What The Actor Does
 
----
+- Scrapes 6 vehicle marketplace sources, with 5 enabled by default
+- Scrapes 11 official Sri Lankan dealer brand catalogs
+- Scrapes 7 vehicle-news sources for tax, import, price, and launch updates
+- Scrapes 5 internship/job sources for IT-focused intern and trainee roles
+- Sends alerts to separate vehicle and intern Telegram channels
+- Sends scraper-health summaries and failures to an optional ops channel
+- Filters used-market alerts to vehicles from 2022 onward by default
+- Deduplicates listings/posts across sources with fuzzy matching
+- Scores vehicle deals and internship relevance before alerting
+- Persists datasets and daily snapshots inside Apify storages
 
-## ✨ Features
+## Tech Stack
 
-- **🚗 Vehicle Price Tracking** — Monitors 6 marketplace sites for cars under your budget (default: LKR 30M)
-- **🏭 Official Dealer Monitoring** — Tracks prices from 11 authorized Sri Lankan vehicle distributors
-- **📰 Vehicle News Alerts** — Catches tax changes, import rule updates, and new model launches from 7 news sources
-- **💼 IT Intern Tracking** — Finds IT internship/trainee posts from 5 job boards across 34 IT keywords
-- **📱 Unified Telegram Channel** — All alerts go to one channel with `#hashtag` categorization for easy filtering
-- **🎯 Smart Scoring** — Deal scoring for vehicles (price/year/mileage) and relevance scoring for intern posts
-- **🔄 Deduplication** — Cross-source fuzzy matching prevents duplicate alerts
-- **📊 Historical Snapshots** — Daily data persistence for trend analysis
+| Area | Implementation |
+| --- | --- |
+| Runtime | Node.js 20+ |
+| Actor platform | Apify Actor SDK |
+| Scraping approach | Axios + Cheerio |
+| Alert delivery | Telegram Bot API |
+| Deduplication | `fast-levenshtein` + heuristic matching |
+| Packaging | Docker (`apify/actor-node-playwright-chrome:20`) |
 
----
+## Source Coverage
 
-## 🏷 Alert Categories
+### Vehicle marketplaces
 
-All alerts are tagged with hashtags for easy filtering in Telegram:
+The codebase contains 6 marketplace scrapers:
 
-| Category | Hashtags | Description |
-|----------|----------|-------------|
-| 🚗 Market Listings | `#vehicle #under30M #ikman` | Used/reconditioned car deals under budget |
-| 🏭 Official Dealers | `#vehicle #official #MG` | Brand-new vehicle prices from authorized dealers |
-| 📰 Vehicle News | `#vehiclenews #taxupdate` | Tax, import, price change articles |
-| 💼 IT Internships | `#intern #IT #Cybersecurity` | IT internship and trainee opportunities |
+| Source key | Site | Default enabled |
+| --- | --- | --- |
+| `ikman` | `ikman.lk` | Yes |
+| `riyasewana` | `riyasewana.com` | No |
+| `patpat` | `patpat.lk` | Yes |
+| `autodirect` | `autodirect.lk` | Yes |
+| `cartivate` | `cartivatemotors.lk` | Yes |
+| `autolanka` | `autolanka.com` | Yes |
 
----
+### Official dealer brands
 
-## 🌐 Sources Monitored
+When `DEALER_BRANDS` is empty, the actor scrapes all supported brands:
 
-### Vehicle Marketplaces (6 sites)
-| Source | URL | Type |
-|--------|-----|------|
-| ikman.lk | ikman.lk/en/ads/sri-lanka/vehicles | Largest SL classifieds |
-| patpat.lk | patpat.lk | Vehicle marketplace |
-| riyasewana.com | riyasewana.com | Established car classifieds |
-| autodirect.lk | autodirect.lk | Vehicle marketplace |
-| Cartivate Motors | cartivatmotors.lk | Dealer/marketplace |
-| AutoLanka | autolanka.com | Car marketplace |
+`MG`, `BYD`, `Toyota`, `Hyundai`, `Suzuki`, `Kia`, `Nissan`,
+`Tata`, `DIMO`, `United Motors`, `BAIC`
 
-### Official Dealers (11 brands)
-| Brand | Dealer | Under 30M Models |
-|-------|--------|-------------------|
-| MG | MG Sri Lanka | ZS MCE (12.4M), ZS Hybrid+ (18.4M), HS PHEV (22.6M) |
-| BYD | John Keells CG Auto | Sealion 6 (from 21.7M) |
-| Toyota | Toyota Lanka | Yaris Cross, smaller lineup |
-| Hyundai | Hyundai Lanka | Venue, Creta, i20 |
-| Suzuki | Suzuki SL (AMW) | Swift, Baleno, Vitara Brezza |
-| Kia | Kia SL (Micro Cars) | Picanto, Stonic |
-| Nissan | Nissan SL (United Motors) | Magnite, Kicks |
-| Tata | Tata SL (DIMO) | Nexon, Punch |
-| DIMO | DIMO | Multi-brand dealer |
-| United Motors | United Motors Lanka | Multi-brand dealer |
-| BAIC | BAIC SL | BJ40, X55, D20 |
+### Vehicle news sources
 
-### Vehicle News (7 sites)
-| Source | Focus |
-|--------|-------|
-| VIASL | Vehicle Importers Association news |
-| Motorguide.lk | Car reviews and price updates |
-| NewsWire.lk | Business/finance vehicle news |
-| Daily Mirror | National newspaper auto section |
-| Ada Derana | News auto/transport section |
-| EconomyNext | Economic impact on vehicle market |
-| AutoLanka News | Auto industry news |
+| Source | Label |
+| --- | --- |
+| `VIASL` | Vehicle Importers Association |
+| `Motorguide` | Motorguide.lk |
+| `Newswire` | Newswire.lk |
+| `DailyMirror` | Daily Mirror Sri Lanka |
+| `AdaDerana` | Ada Derana |
+| `EconomyNext` | EconomyNext |
+| `AutoLankaNews` | AutoLanka News |
 
-### IT Internship Sites (5 sites)
-| Source | Strength |
-|--------|----------|
-| topjobs.lk | Large volume, established employers |
-| XpressJobs | Strong local IT coverage |
-| ikman.lk/jobs | Classifieds job section |
-| ITPro.lk | Niche IT/software focus |
-| LinkedIn Jobs | Professional network, remote roles |
+### Internship sources
 
----
+All 5 intern scrapers are enabled by default:
 
-## 🚀 Quick Start
+`topjobs`, `xpress-jobs`, `ikman-jobs`, `itpro`, `linkedin`
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/sahansbandara/sl-vehicle-intern-tracker.git
-cd sl-vehicle-intern-tracker
+## Telegram Routing
 
-# 2. Install dependencies
-npm install
+The actor supports separate channels for each alert stream:
 
-# 3. Set up environment variables
-cp .env.example .env
-# Edit .env with your Telegram bot token and channel ID
+- `TELEGRAM_VEHICLE_CHAT_ID`: vehicle marketplace alerts, dealer alerts,
+  and vehicle-news alerts
+- `TELEGRAM_INTERN_CHAT_ID`: internship alerts
+- `TELEGRAM_OPS_CHAT_ID`: scraper failures, zero-result warnings, and
+  run summaries
 
-# 4. Run locally
-npm run start:local
-```
+Legacy behavior is still supported:
 
----
+- `TELEGRAM_CHAT_ID` can be used as a fallback for both vehicle and intern channels
+- If `TELEGRAM_OPS_CHAT_ID` is omitted, ops alerts fall back to the vehicle channel
 
-## 📦 Prerequisites
+Typical hashtag patterns sent by the actor:
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| [Node.js](https://nodejs.org/) | 20+ | Runtime |
-| [npm](https://npmjs.com/) | 10+ | Package manager |
-| [Apify CLI](https://docs.apify.com/cli/) | Latest | Cloud deployment (optional) |
-| Telegram Bot | — | Alerts delivery |
+- Vehicle market alerts: `#vehicle #over10M #<source>`
+- Official dealer alerts: `#vehicle #official #<brand>`
+- Vehicle news alerts: `#vehiclenews #<category>`
+- Internship alerts: `#intern #IT #<field>`
 
-### Install Apify CLI (for cloud deployment)
+## Prerequisites
 
-```bash
-npm install -g apify-cli
-apify login  # Enter your Apify API token
-```
+- Node.js 20 or newer
+- npm
+- A Telegram bot token from `@BotFather`
+- At least one target Telegram channel or group ID
+- An Apify account only if you want cloud deployment or Apify storage
+  in production
 
----
+## Local Development
 
-## 💻 Local Setup
-
-### Step 1: Clone and Install
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/sahansbandara/sl-vehicle-intern-tracker.git
 cd sl-vehicle-intern-tracker
+```
+
+### 2. Install dependencies
+
+```bash
 npm install
 ```
 
-### Step 2: Configure Environment
+### 3. Create a local environment file
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your values:
+Then edit `.env`:
 
 ```env
-TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
-TELEGRAM_CHAT_ID=-100your_channel_id
-TELEGRAM_OPS_CHAT_ID=-100your_channel_id
+TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
+TELEGRAM_VEHICLE_CHAT_ID=-100YOUR_VEHICLE_CHANNEL_ID
+TELEGRAM_INTERN_CHAT_ID=-100YOUR_INTERN_CHANNEL_ID
+TELEGRAM_OPS_CHAT_ID=-100YOUR_OPS_CHANNEL_ID
+
 MODE=both
-MAX_PRICE_LKR=30000000
+
+MIN_PRICE_LKR=10000000
+MAX_PRICE_LKR=500000000
+MIN_VEHICLE_YEAR=2022
 MAX_PAGES_PER_SITE=10
 NEWS_ENABLED=true
+
 INTERN_MAX_PAGES_PER_SITE=5
 ```
 
-### Step 3: Run
+### 4. Run locally
+
+Use the local script if you want `.env` loading:
 
 ```bash
-# If you use zsh, paste only the command lines below or run:
-# setopt interactivecomments
-
-# With .env file
 npm run start:local
-
-# Or with local Crawlee storage
-npx crawlee run
-
-# Run only vehicles
-MODE=vehicles npm run start:local
-
-# Run only interns
-MODE=interns npm run start:local
 ```
 
----
+Useful variants:
 
-## ☁️ Deploy to Apify Cloud
+```bash
+MODE=vehicles npm run start:local
+MODE=interns npm run start:local
+MIN_PRICE_LKR=15000000 MAX_PRICE_LKR=30000000 npm run start:local
+MIN_VEHICLE_YEAR=2023 npm run start:local
+```
 
-### Step 1: Install and Authenticate Apify CLI
+Notes:
+
+- `npm run start:local` loads `.env` via `node --env-file=.env`
+- `npm start` does not load `.env`; it expects Apify input or
+  externally injected environment variables
+- If `MODE=both` but only one content channel is configured, the missing
+  mode is skipped and logged as an error
+
+## Configuration Reference
+
+The runtime merges Apify input with environment variables and applies
+code defaults.
+
+- `TELEGRAM_BOT_TOKEN`:
+  required bot token
+- `TELEGRAM_VEHICLE_CHAT_ID`:
+  required for `vehicles` mode
+- `TELEGRAM_INTERN_CHAT_ID`:
+  required for `interns` mode
+- `TELEGRAM_OPS_CHAT_ID`:
+  optional ops channel, defaults to the vehicle channel
+- `TELEGRAM_CHAT_ID`:
+  legacy fallback for both content channels
+- `MODE`:
+  defaults to `both`; valid values are `vehicles`, `interns`, or `both`
+- `MIN_PRICE_LKR`:
+  defaults to `10000000`
+- `MAX_PRICE_LKR`:
+  defaults to `500000000`
+- `MIN_VEHICLE_YEAR`:
+  defaults to `2022`; marketplace listings older than this, or missing
+  a year, are excluded
+- `MAX_PAGES_PER_SITE`:
+  defaults to `10`
+- `SITES_ENABLED`:
+  defaults to `["ikman","patpat","autodirect","cartivate","autolanka"]`
+- `DEALER_BRANDS`:
+  defaults to `[]`, which means all 11 brands
+- `NEWS_ENABLED`:
+  defaults to `true`
+- `INTERN_MAX_PAGES_PER_SITE`:
+  defaults to `5`
+- `INTERN_SITES_ENABLED`:
+  defaults to `["topjobs","xpress-jobs","ikman-jobs","itpro","linkedin"]`
+- `INTERN_KEYWORDS`:
+  defaults to the built-in IT keyword list
+
+There is also backward-compatible support in code for
+`PRICE_ALERT_THRESHOLD_LKR`, but `MAX_PRICE_LKR` is the current
+documented input.
+
+## Apify Usage
+
+### Push the actor
 
 ```bash
 npm install -g apify-cli
 apify login
-# Enter your API token from https://console.apify.com/account/integrations
-```
-
-### Step 2: Push to Apify
-
-```bash
 apify push
 ```
 
-This uploads your code and builds the Docker image on Apify's servers.
-
-### Step 3: Configure on Apify Console
-
-1. Go to [Apify Console](https://console.apify.com/) → Your Actors → **sl-vehicle-intern-tracker**
-2. Click **"Input"** tab and set:
+### Example actor input
 
 ```json
 {
   "TELEGRAM_BOT_TOKEN": "your_bot_token",
-  "TELEGRAM_CHAT_ID": "-100your_channel_id",
+  "TELEGRAM_VEHICLE_CHAT_ID": "-1001234567890",
+  "TELEGRAM_INTERN_CHAT_ID": "-1001234567891",
+  "TELEGRAM_OPS_CHAT_ID": "-1001234567892",
   "MODE": "both",
-  "MAX_PRICE_LKR": 30000000,
-  "SITES_ENABLED": ["ikman", "patpat", "autodirect", "cartivate", "autolanka"],
+  "MIN_PRICE_LKR": 10000000,
+  "MAX_PRICE_LKR": 500000000,
+  "MIN_VEHICLE_YEAR": 2022,
+  "MAX_PAGES_PER_SITE": 10,
+  "SITES_ENABLED": [
+    "ikman",
+    "patpat",
+    "autodirect",
+    "cartivate",
+    "autolanka"
+  ],
   "DEALER_BRANDS": [],
   "NEWS_ENABLED": true,
-  "INTERN_SITES_ENABLED": ["topjobs", "xpress-jobs", "ikman-jobs", "itpro", "linkedin"],
-  "INTERN_KEYWORDS": ["IT", "Software", "Web", "Developer", "Networking", "Cybersecurity", "Data", "AI", "Cloud"]
+  "INTERN_MAX_PAGES_PER_SITE": 5,
+  "INTERN_SITES_ENABLED": [
+    "topjobs",
+    "xpress-jobs",
+    "ikman-jobs",
+    "itpro",
+    "linkedin"
+  ],
+  "INTERN_KEYWORDS": ["IT", "Software", "Developer", "Data", "Cybersecurity", "Cloud"]
 }
 ```
 
-3. Click **"Run"** to test.
+### Scheduling
 
-### Step 4: Set up Scheduling
+Common Apify schedules for this actor:
 
-In the Apify Console:
-1. Go to your actor → **"Schedules"** tab
-2. Click **"Create schedule"**
-3. Set cron expression:
+- Every 6 hours for regular monitoring
+- Every 4 hours for more aggressive alerting
+- Twice daily if you only want summary-style change tracking
 
-| Schedule | Cron Expression | Description |
-|----------|----------------|-------------|
-| Every 6 hours | `0 */6 * * *` | Recommended for regular monitoring |
-| Every 4 hours | `0 */4 * * *` | More frequent checks |
-| Twice daily | `0 8,18 * * *` | Morning and evening (SL time: 1:30 PM, 11:30 PM) |
-| Once daily | `0 6 * * *` | Daily morning check |
+Configure schedules from the Apify Console after the first successful push.
 
----
+## How It Works
 
-## 🤖 Telegram Bot Setup
+### Execution flow
 
-### Step 1: Create a Bot
+1. `src/main.js` initializes the actor and loads input from Apify.
+2. Local `.env` values are used as fallbacks when running outside Apify.
+3. The actor routes execution by `MODE`.
+4. Vehicle mode runs three pipelines:
+   - marketplace scraping
+   - official dealer scraping
+   - vehicle-news scraping
+5. Intern mode scrapes internship sources using the configured keyword list.
+6. Marketplace listings are filtered by price band and minimum model
+   year before alerting.
+7. The actor deduplicates results, scores them, persists them, sends
+   only unseen alerts, then prunes old alerted IDs after 30 days.
 
-1. Open Telegram and search for [@BotFather](https://t.me/BotFather)
-2. Send `/newbot`
-3. Choose a name: e.g., *SL Vehicle Tracker*
-4. Choose a username: e.g., *sl_vehicle_tracker_bot*
-5. Copy the **bot token** (format: `1234567890:ABCdefGhIjKlMnOpQrStUvWxYz`)
+### Vehicle scoring
 
-### Step 2: Create a Channel
+Vehicle listings are scored from `0` to `100` using:
 
-1. Create a new Telegram channel (e.g., "SL Vehicle & Intern Alerts")
-2. Make it **public** or **private**
-3. Add your bot as an **administrator** (with "Post Messages" permission)
+- relative price within the current result set
+- mileage
+- year
+- trim bonus
+- condition bonus
 
-### Step 3: Get Channel ID
+### Internship scoring
 
-**Option A — For public channels:**
-Your chat ID is `@your_channel_username`
+Internship posts are scored from `0` to `100` using:
 
-**Option B — For private channels:**
-1. Add [@userinfobot](https://t.me/userinfobot) to your channel
-2. Forward any message from the channel to @userinfobot
-3. It will reply with the channel ID (format: `-100xxxxxxxxxx`)
+- field specificity
+- company presence
+- salary availability
+- duration availability
+- qualification richness
+- active deadline
+- location presence
+- recency
 
-### Step 4: Test the Bot
+### Deduplication
 
-```bash
-# Test sending a message (replace with your values)
-curl -s "https://api.telegram.org/botYOUR_TOKEN/sendMessage" \
-  -d "chat_id=YOUR_CHANNEL_ID" \
-  -d "text=🤖 Bot is working!"
-```
+The actor uses fuzzy matching with `fast-levenshtein` plus source-specific heuristics:
 
----
+- Vehicle duplicates consider normalized title similarity, price
+  proximity, location, and year
+- Internship duplicates consider normalized title similarity, company, and location
 
-## ⚙️ Configuration
+## Output Storage
 
-### All Input Parameters
+The actor writes to multiple Apify storages:
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `TELEGRAM_BOT_TOKEN` | string | **required** | Bot token from @BotFather |
-| `TELEGRAM_CHAT_ID` | string | **required** | Target channel/chat ID |
-| `TELEGRAM_OPS_CHAT_ID` | string | Same as above | Separate channel for ops alerts |
-| `MODE` | enum | `"both"` | `"vehicles"`, `"interns"`, or `"both"` |
-| `MAX_PRICE_LKR` | integer | `30000000` | Vehicle budget cap in LKR |
-| `MAX_PAGES_PER_SITE` | integer | `10` | Max pages per marketplace |
-| `SITES_ENABLED` | array | See below | Which market sites to scrape |
-| `DEALER_BRANDS` | array | `[]` (all) | Which dealer brands to monitor |
-| `NEWS_ENABLED` | boolean | `true` | Enable vehicle news monitoring |
-| `INTERN_MAX_PAGES_PER_SITE` | integer | `5` | Max pages per job board |
-| `INTERN_SITES_ENABLED` | array | See below | Which intern sites to scrape |
-| `INTERN_KEYWORDS` | array | 34 keywords | IT field keywords to filter |
+### Datasets
 
-### Default Values
+| Dataset | Contents |
+| --- | --- |
+| default dataset | scored vehicle marketplace listings |
+| `dealer-models` | official dealer vehicle models |
+| `vehicle-news` | vehicle-news articles |
+| `intern-posts` | scored internship posts |
 
-```json
-{
-  "SITES_ENABLED": ["ikman", "patpat", "autodirect", "cartivate", "autolanka"],
-  "DEALER_BRANDS": [],
-  "INTERN_SITES_ENABLED": ["topjobs", "xpress-jobs", "ikman-jobs", "itpro", "linkedin"],
-  "INTERN_KEYWORDS": [
-    "IT", "Software", "Web", "Mobile", "Developer", "Engineering", "Data",
-    "AI", "Machine Learning", "DevOps", "Cloud", "QA", "Testing", "UI", "UX",
-    "Database", "Networking", "Cybersecurity", "Security", "System Administration",
-    "Computer Science", "Full Stack", "Frontend", "Backend", "Python", "Java",
-    "React", "Node.js", "AWS", "Azure"
-  ]
-}
-```
+### Key-value stores
 
----
+| Store | Purpose |
+| --- | --- |
+| `cars-under-budget-history` | daily vehicle marketplace snapshots |
+| `dealer-models-history` | daily dealer snapshots |
+| `vehicle-news-history` | daily news snapshots |
+| `intern-tracker-history` | daily internship snapshots |
+| `alerted-listings` | vehicle marketplace IDs already alerted |
+| `alerted-dealer-models` | dealer model IDs already alerted |
+| `alerted-news` | news article IDs already alerted |
+| `alerted-intern-posts` | internship post IDs already alerted |
 
-## 🏗 Architecture
+Every snapshot store also keeps a `latest` key for convenient access to
+the most recent run.
 
-```
-main.js (MODE dispatcher: vehicles | interns | both)
-│
-├── vehicle-tracker.js
-│   ├── MARKET (6 sites) → normalize → dedupe → score → persist → #vehicle alerts
-│   │   ikman, patpat, riyasewana, autodirect, cartivate, autolanka
-│   │
-│   ├── DEALERS (11 brands) → persist → #official alerts
-│   │   MG, BYD, Toyota, Hyundai, Suzuki, Kia, Nissan, Tata,
-│   │   DIMO, United Motors, BAIC
-│   │
-│   └── NEWS (7 sites) → persist → #vehiclenews alerts
-│       VIASL, Motorguide, Newswire, Daily Mirror, Ada Derana,
-│       EconomyNext, AutoLanka
-│
-└── intern-tracker.js
-    └── 5 SOURCES → normalize → dedupe → score → persist → #intern alerts
-        topjobs, xpress-jobs, ikman-jobs, itpro, linkedin
-```
+## Project Structure
 
-### Data Pipeline
-
-```
-Scrape → Normalize → Dedupe → Score → Persist → Telegram Alert
-  │          │          │        │        │           │
-  │          │          │        │        │           └── MarkdownV2 + hashtags
-  │          │          │        │        └── Apify Dataset + KV Store
-  │          │          │        └── Deal score (0-100) or Relevance score (0-100)
-  │          │          └── SHA-1 ID + Levenshtein fuzzy matching
-  │          └── Unified schema (vehicle/intern/news/dealer)
-  └── Axios + Cheerio HTML parsing
-```
-
----
-
-## 📁 Project Structure
-
-```
-sl-vehicle-intern-tracker/
-├── .actor/
-│   └── actor.json              # Apify actor config (v3.0)
+```text
+.
+├── .actor/                 # Apify actor metadata
 ├── src/
-│   ├── main.js                 # Entry: mode dispatcher
+│   ├── main.js             # Entry point and mode routing
 │   ├── modes/
-│   │   ├── vehicle-tracker.js  # Orchestrates market + dealer + news
-│   │   └── intern-tracker.js   # Orchestrates 5 job boards
+│   │   ├── vehicle-tracker.js
+│   │   └── intern-tracker.js
 │   ├── scrapers/
-│   │   ├── ikman.js            # ikman.lk marketplace
-│   │   ├── patpat.js           # patpat.lk marketplace
-│   │   ├── riyasewana.js       # riyasewana.com marketplace
-│   │   ├── autodirect.js       # autodirect.lk marketplace
-│   │   ├── cartivate.js        # cartivatmotors.lk marketplace
-│   │   ├── autolanka.js        # autolanka.com marketplace
-│   │   ├── dealers.js          # 11 official dealer sites (config factory)
-│   │   ├── news.js             # 7 news sites (config factory)
-│   │   ├── topjobs.js          # topjobs.lk job board
-│   │   ├── ikman-jobs.js       # ikman.lk/jobs section
-│   │   ├── xpress-jobs.js      # xpress.jobs portal
-│   │   ├── itpro-jobs.js       # itpro.lk IT niche board
-│   │   └── linkedin-jobs.js    # LinkedIn public search
+│   │   ├── ikman.js
+│   │   ├── riyasewana.js
+│   │   ├── patpat.js
+│   │   ├── autodirect.js
+│   │   ├── cartivate.js
+│   │   ├── autolanka.js
+│   │   ├── dealers.js
+│   │   ├── news.js
+│   │   ├── topjobs.js
+│   │   ├── xpress-jobs.js
+│   │   ├── ikman-jobs.js
+│   │   ├── itpro-jobs.js
+│   │   └── linkedin-jobs.js
 │   └── utils/
-│       ├── dedupe.js           # Cross-source deduplication
-│       ├── normalize.js        # Data normalization
-│       ├── score.js            # Deal + relevance scoring
-│       ├── storage.js          # Dataset + KV persistence
-│       └── telegram.js         # Bot API + hashtag alerts
-├── .env.example                # Env template
-├── .gitignore                  # Ignores .env, node_modules
-├── CLAUDE.md                   # Agent context file
-├── Dockerfile                  # Apify Docker build
-├── INPUT_SCHEMA.json           # Apify input form schema
-├── LICENSE                     # MIT License
-├── package.json                # v3.0.0
-└── README.md                   # This file
+│       ├── dedupe.js
+│       ├── normalize.js
+│       ├── score.js
+│       ├── storage.js
+│       └── telegram.js
+├── Dockerfile
+├── INPUT_SCHEMA.json
+├── package.json
+└── README.md
 ```
 
----
+## Operational Notes
 
-## 💾 Data Storage
+- Zero-result scrapes trigger an ops warning so selector breakages are
+  visible quickly.
+- Scraper failures trigger an ops alert with the error message.
+- The default vehicle marketplace set does not include `riyasewana`;
+  add it explicitly if you want it.
+- The Docker image uses Apify's Playwright base image, but the current
+  scraper implementation is Axios/Cheerio-driven.
+- There is no automated test suite or lint task defined in
+  `package.json` at the moment.
 
-### Apify Datasets
-| Dataset | What's Stored |
-|---------|---------------|
-| `default` | Market vehicle listings (price, year, mileage, deal score) |
-| `dealer-models` | Official dealer model/price data |
-| `vehicle-news` | News articles (title, source, category, date) |
-| `intern-posts` | IT intern postings (company, salary, field, relevance) |
+## License
 
-### Key-Value Stores (Daily Snapshots)
-| Store Name | Purpose |
-|-----------|---------|
-| `cars-under-budget-history` | Vehicle market price trends |
-| `dealer-models-history` | Official price change tracking |
-| `vehicle-news-history` | News article archive |
-| `intern-tracker-history` | Intern post history |
-| `alerted-listings` | Dedup IDs for market alerts |
-| `alerted-dealer-models` | Dedup IDs for dealer alerts |
-| `alerted-news` | Dedup IDs for news alerts |
-| `alerted-intern-posts` | Dedup IDs for intern alerts |
-
----
-
-## ⏰ Scheduling
-
-### Apify Console
-1. Go to **Schedules** → **Create schedule**
-2. Set your preferred cron expression
-3. Link it to your actor
-
-### Recommended Schedules
-
-| Use Case | Cron | Frequency |
-|----------|------|-----------|
-| Active monitoring | `0 */4 * * *` | Every 4 hours |
-| Standard | `0 */6 * * *` | Every 6 hours |
-| Daily check | `0 6 * * *` | Once daily at 6AM UTC |
-| Weekdays only | `0 8 * * 1-5` | Mon-Fri at 8AM UTC |
-
----
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-| Issue | Solution |
-|-------|----------|
-| `TELEGRAM_BOT_TOKEN required` | Set token in `.env` or Apify input |
-| `403 Forbidden` from Telegram | Add bot as channel admin with "Post Messages" |
-| `0 listings from all sites` | Website selectors may have changed; check ops alerts |
-| Site returns empty | Website may be blocking requests; check user-agent |
-| `parsedPrice is null` | Price format changed on the site |
-
-### Checking Logs
-
-```bash
-# Local
-npm run start:local 2>&1 | tee run.log
-# or
-npx crawlee run 2>&1 | tee run.log
-
-# Apify Cloud
-# Go to Console → Runs → Click on run → "Log" tab
-```
-
-### Validating Syntax
-
-```bash
-# Check all source files
-for f in src/main.js src/modes/*.js src/scrapers/*.js src/utils/*.js; do
-  node --check "$f" && echo "✅ $f" || echo "❌ $f FAILED"
-done
-```
-
----
-
-## 📄 License
-
-[MIT License](LICENSE) — made with ❤️ for Sri Lanka's vehicle buyers and IT students.
-
----
-
-<p align="center">
-  <strong>Built by <a href="https://github.com/sahansbandara">sahansbandara</a> (SLIIT IT24100559)</strong>
-</p>
+This project is licensed under the MIT License. See `LICENSE` for details.

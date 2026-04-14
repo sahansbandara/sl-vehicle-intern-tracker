@@ -53,6 +53,14 @@
       "minimum": 100000,
       "maximum": 500000000
     },
+    "MIN_VEHICLE_YEAR": {
+      "title": "Minimum Vehicle Year",
+      "type": "integer",
+      "description": "Only alert used-market listings whose model year is this value or newer. Default 2022.",
+      "default": 2022,
+      "minimum": 1980,
+      "maximum": 2100
+    },
     "MAX_PAGES_PER_SITE": {
       "title": "Max Pages Per Vehicle Market Site",
       "type": "integer",
